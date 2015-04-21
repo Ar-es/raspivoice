@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
 	//Retrieve command line options:
 	int option_index = 0;
 	int opt;
-	while ((opt = getopt_long_only(argc, argv, "r:c:i:a:pb:vne:f:r:s:", long_options, &option_index)) != -1)
+	while ((opt = getopt_long_only(argc, argv, "r:c:i:a:pB:vnf:R:e:b:z:mE:G:l:h:t:x:d:F:D:N:S:T:O:", long_options, &option_index)) != -1)
 	{
 		switch (opt)
 		{
@@ -220,7 +220,7 @@ int main(int argc, char *argv[])
 		std::cout << "-e  --exposure=[0]\t\t\tCamera exposure time setting, 1-100. Use 0 for auto." << std::endl;
 		std::cout << "-b  --blinders=[0]\t\t\tBlinders left and right, pixel size (0-89 for default columns)" << std::endl;
 		std::cout << "-z  --zoom=[1.0]\t\t\tZoom factor (>= 1.0)" << std::endl;
-		std::cout << "-m  --foveal_mapping\t\tEnable foveal mapping (barrel distortion magnifying center region)" << std::endl;
+		std::cout << "-m  --foveal_mapping\t\t\tEnable foveal mapping (barrel distortion magnifying center region)" << std::endl;
 		std::cout << "-T, --threshold=[0]\t\t\tEnable threshold for black/white image if > 0. Range 1-255, use 127 as a starting point. 255=auto." << std::endl;
 		std::cout << "-E, --edge_detection_opacity=[0.0]\tEnable edge detection if > 0. Opacity of detected edges between 0.0 and 1.0." << std::endl;
 		std::cout << "-G  --edge_detection_threshold=[127]\tEdge detection threshold value 1-255." << std::endl;
