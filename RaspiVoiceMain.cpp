@@ -39,6 +39,10 @@ int main(int argc, char *argv[])
 	rvopt.negative_image = false;
 	rvopt.flip = 0;
 	rvopt.read_frames = 2;
+	rvopt.exposure = 0;
+	rvopt.blinders = 0;
+	rvopt.zoom = 1;
+	rvopt.foveal_mapping = false;
 	rvopt.threshold = 0;
 	rvopt.edge_detection_opacity = 0.0;
 	rvopt.edge_detection_threshold = 127;
@@ -64,24 +68,28 @@ int main(int argc, char *argv[])
 		{ "input_filename",		required_argument,  0, 'i' },
 		{ "audio_device",		required_argument,	0, 'a' },
 		{ "preview",			no_argument,		0, 'p' },
-		{ "use_bw_test_image",	required_argument,	0, 'b' },
+		{ "use_bw_test_image",	required_argument,	0, 'B' },
 		{ "verbose",			no_argument,		0, 'v' },
 		{ "negative_image",		no_argument,		0, 'n' },
 		{ "flip",				required_argument,  0, 'f' },
-		{ "edge_detection_opacity",		required_argument, 0, 'e' },
-		{ "edge_detection_threshold",	required_argument, 0, 'g' },
+		{ "read_frames",		required_argument,	0, 'R' },
+		{ "exposure",			required_argument,	0, 'e' },
+		{ "blinders",			required_argument,	0, 'b' },
+		{ "zoom",				required_argument,	0, 'z' },
+		{ "foveal_mapping",		no_argument,		0, 'm' },
+		{ "edge_detection_opacity",		required_argument, 0, 'E' },
+		{ "edge_detection_threshold",	required_argument, 0, 'G' },
 		{ "freq_lowest",		required_argument,	0, 'l' },
 		{ "freq_highest",		required_argument,	0, 'h' },
 		{ "total_time_s",		required_argument,	0, 't' },
 		{ "use_exponential",	required_argument,	0, 'x' },
 		{ "use_delay",			required_argument,	0, 'd' },
-		{ "use_fade",			required_argument,	0, 1 },
-		{ "use_diffraction",	required_argument,	0, 2 },
-		{ "use_bspline",		required_argument,	0, 3 },
-		{ "sample_freq_Hz",		required_argument,	0, 4 },
-		{ "read_frames",			required_argument,	0, 5 },
-		{ "threshold",			required_argument,	0, 6 },
-		{ "use_stereo",			required_argument,  0, 7 },
+		{ "use_fade",			required_argument,	0, 'F' },
+		{ "use_diffraction",	required_argument,	0, 'D' },
+		{ "use_bspline",		required_argument,	0, 'N' },
+		{ "sample_freq_Hz",		required_argument,	0, 'S' },
+		{ "threshold",			required_argument,	0, 'T' },
+		{ "use_stereo",			required_argument,  0, 'O' },
 		{ 0, 0, 0, 0 }
 	};
 
@@ -112,7 +120,7 @@ int main(int argc, char *argv[])
 			case 'p':
 				rvopt.preview = true;
 				break;
-			case 'b':
+			case 'B':
 				rvopt.use_bw_test_image = (atoi(optarg) != 0);
 				break;
 			case 'v':
@@ -124,10 +132,10 @@ int main(int argc, char *argv[])
 			case 'n':
 				rvopt.negative_image = true;
 				break;
-			case 'e':
+			case 'E':
 				rvopt.edge_detection_opacity = atof(optarg);
 				break;
-			case 'g':
+			case 'G':
 				rvopt.edge_detection_threshold = atoi(optarg);
 				break;
 			case 'l':
@@ -145,25 +153,37 @@ int main(int argc, char *argv[])
 			case 'd':
 				rvopt.use_delay = (atoi(optarg) != 0);
 				break;
-			case 1:
+			case 'F':
 				rvopt.use_fade = (atoi(optarg) != 0);
 				break;
-			case 2:
-				rvopt.use_diffraction = (atoi(optarg) != 0);
-				break;
-			case 3:
-				rvopt.use_bspline = (atoi(optarg) != 0);
-				break;
-			case 4:
-				rvopt.sample_freq_Hz = atof(optarg);
-				break;
-			case 5:
+			case 'R':
 				rvopt.read_frames = atoi(optarg);
 				break;
-			case 6:
+			case 'e':
+				rvopt.exposure = atoi(optarg);
+				break;
+			case 'b':
+				rvopt.blinders = atoi(optarg);
+				break;
+			case 'z':
+				rvopt.zoom = atof(optarg);
+				break;
+			case 'm':
+				rvopt.foveal_mapping = true;
+				break;
+			case 'D':
+				rvopt.use_diffraction = (atoi(optarg) != 0);
+				break;
+			case 'N':
+				rvopt.use_bspline = (atoi(optarg) != 0);
+				break;
+			case 'S':
+				rvopt.sample_freq_Hz = atof(optarg);
+				break;
+			case 'T':
 				rvopt.threshold = atoi(optarg);
 				break;
-			case 7:
+			case 'O':
 				rvopt.use_stereo = (atoi(optarg) != 0);
 				break;
 			case '?':
@@ -194,24 +214,26 @@ int main(int argc, char *argv[])
 		std::cout << "-a, --audio_device=[default]\t\tAudio output device, type aplay -L to get list" << std::endl;
 		std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
 		std::cout << "-v, --verbose\t\t\t\tVerbose outputs." << std::endl;
-		std::cout << std::endl;
-		std::cout << "More options: " << std::endl;
 		std::cout << "-n, --negative_image" << std::endl;
 		std::cout << "-f, --flip=[0]\t\t\t\t0: no flipping, 1: horizontal, 2: verticel, 3: both" << std::endl;
-		std::cout << "    --read_frames=[2]\t\t\tSet number of frames to read from camera before processing (>= 1). Optimize for minimal lag." << std::endl;
-		std::cout << "    --threshold=[0]\t\t\tEnable threshold for black/white image if > 0. Range 1-255, use 127 as a starting point. 255=auto." << std::endl;
-		std::cout << "-e, --edge_detection_opacity=[0.0]\tEnable edge detection if > 0. Opacity of detected edges between 0.0 and 1.0." << std::endl;
-		std::cout << "    --edge_detection_threshold=[127]\tEdge detection threshold value 1-255." << std::endl;
+		std::cout << "-R, --read_frames=[2]\t\t\tSet number of frames to read from camera before processing (>= 1). Optimize for minimal lag." << std::endl;
+		std::cout << "-e  --exposure=[0]\t\t\tCamera exposure time setting, 1-100. Use 0 for auto." << std::endl;
+		std::cout << "-b  --blinders=[0]\t\t\tBlinders left and right, pixel size (0-89 for default columns)" << std::endl;
+		std::cout << "-z  --zoom=[1.0]\t\t\tZoom factor (>= 1.0)" << std::endl;
+		std::cout << "-m  --foveal_mapping\t\tEnable foveal mapping (barrel distortion magnifying center region)" << std::endl;
+		std::cout << "-T, --threshold=[0]\t\t\tEnable threshold for black/white image if > 0. Range 1-255, use 127 as a starting point. 255=auto." << std::endl;
+		std::cout << "-E, --edge_detection_opacity=[0.0]\tEnable edge detection if > 0. Opacity of detected edges between 0.0 and 1.0." << std::endl;
+		std::cout << "-G  --edge_detection_threshold=[127]\tEdge detection threshold value 1-255." << std::endl;
 		std::cout << "-l, --freq_lowest=[500]" << std::endl;
 		std::cout << "-h, --freq_highest=[5000]" << std::endl;
-		std::cout << "    --total_time_s=[1.05]" << std::endl;
-		std::cout << "    --use_exponential=[1]" << std::endl;
-		//std::cout << "    --use_stereo=[1]" << std::endl;
-		std::cout << "    --use_delay=[1]" << std::endl;
-		std::cout << "    --use_fade=[1]" << std::endl;
-		std::cout << "    --use_diffraction=[1]" << std::endl;
-		std::cout << "    --use_bspline=[1]" << std::endl;
-		std::cout << "    --sample_freq_Hz=[44100]" << std::endl;
+		std::cout << "-t, --total_time_s=[1.05]" << std::endl;
+		std::cout << "-x  --use_exponential=[1]" << std::endl;
+		//std::cout << "-o  --use_stereo=[1]" << std::endl;
+		std::cout << "-d, --use_delay=[1]" << std::endl;
+		std::cout << "-F, --use_fade=[1]" << std::endl;
+		std::cout << "-D  --use_diffraction=[1]" << std::endl;
+		std::cout << "-N  --use_bspline=[1]" << std::endl;
+		std::cout << "-S  --sample_freq_Hz=[44100]" << std::endl;
 		std::cout << std::endl;
 		return 0;
 	}

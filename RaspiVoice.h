@@ -20,6 +20,10 @@ typedef struct
 	bool negative_image;
 	int flip;
 	int read_frames;
+	int exposure;
+	int blinders;
+	float zoom;
+	bool foveal_mapping;
 	int threshold;
 	float edge_detection_opacity;
 	int edge_detection_threshold;
@@ -61,7 +65,8 @@ private:
 	void initTestImage();
 	void initRaspiCam();
 	void initUsbCam();
-	void readImage();
+	cv::Mat readImage();
+	void processImage(cv::Mat rawImage);
 	int playWav(std::string filename);
 public:
 	RaspiVoice(RaspiVoiceOptions opt);

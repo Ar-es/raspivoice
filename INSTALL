@@ -46,7 +46,7 @@ raspivoice --help
 - Choose camera:
 Default is USB camera 0 (check with lsusb if connected)
 
-Test image (Ascii art in config.h):
+Test image (Ascii art in config.h) (warning: most options do not work with the test image):
 raspivoice -s0
 
 Raspberry Pi camera:

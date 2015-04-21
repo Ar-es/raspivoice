@@ -82,6 +82,10 @@ void RaspiVoice::init()
 	{
 		cv::namedWindow("RaspiVoice Preview", CV_WINDOW_NORMAL);
 	}
+
+	//Test read + process one image:
+	cv::Mat im = readImage();
+	processImage(im);
 }
 
 void RaspiVoice::initTestImage()
@@ -153,8 +157,13 @@ void RaspiVoice::initRaspiCam()
 	}
 
 	raspiCam.set(CV_CAP_PROP_FORMAT, CV_8UC1);
-	raspiCam.set(CV_CAP_PROP_FRAME_WIDTH, 320);
+	raspiCam.set(CV_CAP_PROP_FRAME_WIDTH, 320); //Somehow, other resolutions did not work
 	raspiCam.set(CV_CAP_PROP_FRAME_HEIGHT, 240);
+	if ((opt.exposure >= 1) && (opt.exposure <= 100))
+	{
+		raspiCam.set(CV_CAP_PROP_EXPOSURE, opt.exposure);
+	}
+	
 	if (!raspiCam.open())
 	{
 		throw(std::runtime_error("Error opening RaspiCam."));
@@ -185,8 +194,14 @@ void RaspiVoice::initUsbCam()
 	// Setting standard capture size, may fail; resize later
 	cv::Mat rawImage;
 	cap.read(rawImage);  // Dummy read needed with some devices
-	cap.set(CV_CAP_PROP_FRAME_WIDTH, 176);
-	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 144);
+	//cap.set(CV_CAP_PROP_FRAME_WIDTH, 176);
+	//cap.set(CV_CAP_PROP_FRAME_HEIGHT, 144);
+	cap.set(CV_CAP_PROP_FRAME_WIDTH, 320); //Increased resolution necessary for foveal mapping
+	cap.set(CV_CAP_PROP_FRAME_HEIGHT, 240);
+	if ((opt.exposure >= 1) && (opt.exposure <= 100))
+	{
+		cap.set(CV_CAP_PROP_EXPOSURE, opt.exposure);
+	}
 
 	if (verbose)
 	{
@@ -194,7 +209,7 @@ void RaspiVoice::initUsbCam()
 	}
 }
 
-void RaspiVoice::readImage()
+cv::Mat RaspiVoice::readImage()
 {
 	cv::Mat rawImage;
 	cv::Mat processedImage;
@@ -225,7 +240,6 @@ void RaspiVoice::readImage()
 	}
 	else if (image_source >= 2) //OpenCv camera
 	{
-
 		cap.read(rawImage);
 		if (opt.read_frames > 1)
 		{
@@ -243,6 +257,14 @@ void RaspiVoice::readImage()
 		cv::cvtColor(rawImage, processedImage, CV_BGR2GRAY);
 	}
 
+	return processedImage;
+}
+
+
+void RaspiVoice::processImage(cv::Mat rawImage)
+{
+	cv::Mat processedImage = rawImage;
+
 	if (verbose)
 	{
 		printtime("ProcessImage start");
@@ -250,9 +272,36 @@ void RaspiVoice::readImage()
 
 	if ((image_source > 0) || (opt.input_filename != ""))
 	{
+		if (opt.foveal_mapping)
+		{
+			cv::Matx33f cameraMatrix(100, 0, processedImage.cols / 2, 0, 100, processedImage.rows / 2, 0, 0, 1);
+			cv::Matx41f distCoeffs(5.0, 5.0, 0, 0);
+			cv::Mat processedImage2;
+			cv::undistort(processedImage, processedImage2, cameraMatrix, distCoeffs);
+			float clipzoom = 1.8; //horizontal zoom to remove blinders, decreases resolution if > 1.0
+			cv::Rect roi(processedImage.cols / 2 - columns / 2 / clipzoom, processedImage.rows / 2 - rows / 2, columns / clipzoom, rows);
+			processedImage = processedImage2(roi);
+		}
+
+		if (opt.zoom > 1.0)
+		{
+			int w = processedImage.cols;
+			int h = processedImage.rows;
+			float z = opt.zoom;
+			cv::Rect roi((w / 2.0) - w / (2.0*z), (h / 2.0) - h / (2.0*z), w/z, h/z);
+			processedImage = processedImage(roi);
+		}
+
+		//Bring to size needed by ImageToSoundscape:
 		if (processedImage.rows != rows || processedImage.cols != columns)
 		{
 			cv::resize(processedImage, processedImage, cv::Size(columns, rows));
+		}
+
+		if ((opt.blinders > 0) && (opt.blinders < columns/2))
+		{
+			processedImage(cv::Rect(0, 0, opt.blinders, rows - 1)).setTo(0);
+			processedImage(cv::Rect(columns - 1 - opt.blinders, 0, opt.blinders, rows - 1)).setTo(0);
 		}
 
 		if (opt.edge_detection_opacity > 0.0)
@@ -349,11 +398,12 @@ void RaspiVoice::readImage()
 
 void RaspiVoice::PlayFrame()
 {
-	readImage();
+	cv::Mat im = readImage();
+	processImage(im);
 
 	if (verbose)
 	{
-		printtime("Process start");
+		printtime("vOICe algorithm process start");
 	}
 	i2ssConverter->Process(*image);
 
