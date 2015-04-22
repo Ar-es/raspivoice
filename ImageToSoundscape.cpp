@@ -72,7 +72,8 @@ ImageToSoundscapeConverter::ImageToSoundscapeConverter(int rows, int columns, do
 
 float ImageToSoundscapeConverter::rnd()
 {
-	uint32_t ir = 0L, ia = 9301, ic = 49297, im = 233280;
+	static uint32_t ir = 0L;
+	uint32_t ia = 9301, ic = 49297, im = 233280;
 	ir = (ir*ia + ic) % im;
 	return ir / (1.0 * im);
 }

@@ -13,6 +13,7 @@ typedef struct
 	int columns;
 	int image_source;
 	std::string input_filename;
+	std::string output_filename;
 	std::string audio_device;
 	bool preview;
 	bool use_bw_test_image;
@@ -21,6 +22,8 @@ typedef struct
 	int flip;
 	int read_frames;
 	int exposure;
+	int brightness;
+	float contrast;
 	int blinders;
 	float zoom;
 	bool foveal_mapping;
@@ -39,6 +42,7 @@ typedef struct
 	bool use_bspline;
 	float speed_of_sound_m_s;
 	float acoustical_size_of_head_m;
+	bool mute;
 } RaspiVoiceOptions;
 
 class RaspiVoice
@@ -71,6 +75,6 @@ private:
 public:
 	RaspiVoice(RaspiVoiceOptions opt);
 	~RaspiVoice();
-	void PlayFrame();
+	void PlayFrame(RaspiVoiceOptions opt);
 };
 

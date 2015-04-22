@@ -7,7 +7,7 @@ And Raspberry Pi 2 Model B, running Raspbian, Linux raspberrypi 3.18.7-v7+ #755 
 
 2. install necessary packages:
 
-sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8
+sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8 libncurses5-dev
 
 3. install raspicam: (follow http://www.uco.es/investiga/grupos/ava/node/40 in case of errors):
 
@@ -23,14 +23,14 @@ sudo make install
 sudo ldconfig
 
 4. Go to raspivoice source folder (where this INSTALL file is located) and build raspivoice:
-cd ~/raspivoice_src 	#press TAB key to extend
+cd ~/raspivoice/
 
-#on Raspberry pi 1:
+# -either-: on Raspberry pi 1:
 make -j 4
-#on Raspberry Pi 2:
+# -or-: on Raspberry Pi 2:
 make -j 4 CONFIG=release_rpi2
 
-5. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel with Ctrl+C):
+5. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel by pressing Enter.):
 ./Release/raspivoice -s0 -v
 
 6. install to system:

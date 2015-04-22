@@ -304,6 +304,39 @@ void RaspiVoice::processImage(cv::Mat rawImage)
 			processedImage(cv::Rect(columns - 1 - opt.blinders, 0, opt.blinders, rows - 1)).setTo(0);
 		}
 
+		if ((opt.contrast != 1.0) || (opt.brightness != 0))
+		{
+			float alpha = opt.contrast;
+			int beta = opt.brightness;
+
+			for (int y = 0; y < processedImage.rows; y++)
+			{
+				for (int x = 0; x < processedImage.cols; x++)
+				{
+					processedImage.at<uchar>(y, x) = cv::saturate_cast<uchar>(alpha*(processedImage.at<uchar>(y, x)) + beta);
+				}
+			}
+		}
+
+		if (opt.threshold > 0)
+		{
+			if (opt.threshold < 255)
+			{
+				cv::threshold(processedImage, processedImage, opt.threshold, 255, cv::THRESH_BINARY);
+			}
+			else
+			{
+				//Auto threshold:
+				cv::threshold(processedImage, processedImage, 127, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+			}
+		}
+
+		if (opt.negative_image)
+		{
+			cv::Mat sub_mat = cv::Mat::ones(processedImage.size(), processedImage.type()) * 255;
+			cv::subtract(sub_mat, processedImage, processedImage);
+		}
+
 		if (opt.edge_detection_opacity > 0.0)
 		{
 			cv::Mat blurImage;
@@ -325,26 +358,6 @@ void RaspiVoice::processImage(cv::Mat rawImage)
 			}
 			double beta = (1.0 - alpha);
 			cv::addWeighted(edgesImage, alpha, processedImage, beta, 0.0, processedImage);
-		}
-
-		if (opt.threshold > 0)
-		{
-			if (opt.threshold < 255)
-			{
-				cv::threshold(processedImage, processedImage, opt.threshold, 255, cv::THRESH_BINARY);
-			}
-			else
-			{
-				//Auto threshold:
-				cv::threshold(processedImage, processedImage, 127, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-			}
-			
-		}
-
-		if (opt.negative_image)
-		{
-			cv::Mat sub_mat = cv::Mat::ones(processedImage.size(), processedImage.type()) * 255;
-			cv::subtract(sub_mat, processedImage, processedImage);
 		}
 
 		if ((opt.flip >= 1) && (opt.flip <= 3))
@@ -396,8 +409,12 @@ void RaspiVoice::processImage(cv::Mat rawImage)
 
 }
 
-void RaspiVoice::PlayFrame()
+void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
 {
+	//Set new options. Options that have been copied to RaspiVoice:: fields in constructor are unaffected.
+	this->opt = opt;
+
+	//Read and process images:
 	cv::Mat im = readImage();
 	processImage(im);
 
@@ -407,17 +424,29 @@ void RaspiVoice::PlayFrame()
 	}
 	i2ssConverter->Process(*image);
 
-	AudioData &audioData = i2ssConverter->GetAudioData();
-	audioData.DeviceName = opt.audio_device;
-	audioData.Verbose = verbose;
-
-	if (verbose)
+	if (!opt.mute)
 	{
-		printtime("Playing audio");
+		AudioData &audioData = i2ssConverter->GetAudioData();
+		audioData.DeviceName = opt.audio_device;
+		audioData.Verbose = verbose;
+
+		if (verbose)
+		{
+			printtime("Playing audio");
+		}
+		audioData.Play();
+
+		if (opt.output_filename != "")
+		{
+			audioData.SaveToWavFile(opt.output_filename);
+		}
+
+		//audioData.PlayWav(FNAME);
 	}
-	audioData.Play();
-	//audioData.SaveToWavFile("raspivoice_output.wav");
-	//audioData.PlayWav(FNAME);
+	else if (verbose)
+	{
+		printtime("Muted, not playing audio");
+	}
 }
 
 
