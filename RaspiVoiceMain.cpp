@@ -35,6 +35,7 @@ pthread_mutex_t rvopt_mutex;
 
 bool quit_flag = false;
 pthread_mutex_t quit_flag_mutex;
+std::exception_ptr exc_ptr;
 
 int main(int argc, char *argv[])
 {
@@ -239,7 +240,7 @@ int main(int argc, char *argv[])
 		std::cout << "-c, --columns=[178]\t\t\tNumber of columns, i.e. horizontal (time) soundscape resolution (ignored if test image is used)" << std::endl;
 		std::cout << "-s, --image_source=[1]\t\t\tImage source: 0 for image file, 1 for RaspiCam, 2 for 1st USB camera, 3 for 2nd USB camera..." << std::endl;
 		std::cout << "-i, --input_filename=[]\t\t\tPath to image file (bmp,jpg,png,ppm,tif). Reread every frame. Static test image is used if empty." << std::endl; 
-		std::cout << "-i, --output_filename=[]\t\tPath to output file (wav). Written every frame if not muted." << std::endl;
+		std::cout << "-o, --output_filename=[]\t\tPath to output file (wav). Written every frame if not muted." << std::endl;
 		std::cout << "-a, --audio_device=[default]\t\tAudio output device, type aplay -L to get list" << std::endl;
 		std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
 		std::cout << "-v, --verbose\t\t\t\tVerbose outputs." << std::endl;
@@ -289,7 +290,17 @@ int main(int argc, char *argv[])
 		while (!quit)
 		{
 			int ch = getch();
-			quit = key_pressed_action(ch);
+			if (ch != ERR)
+			{
+				quit = key_pressed_action(ch);
+			}
+
+			pthread_mutex_lock(&quit_flag_mutex);
+			if (quit_flag)
+			{
+				quit = true;
+			}
+			pthread_mutex_unlock(&quit_flag_mutex);
 		}
 
 		//quit ncurses:
@@ -309,9 +320,23 @@ int main(int argc, char *argv[])
 	}
 
 	//Wait for worker thread:
-	int *pretval;
-	pthread_join(thr, (void **)&pretval);
-	return(*pretval);
+	pthread_join(thr, nullptr);
+
+	//Check for exception from worker thread:
+	if (exc_ptr != nullptr)
+	{
+		try
+		{
+			std::rethrow_exception(exc_ptr);
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "Error: " << e.what() << std::endl;
+			return(-1);
+		}
+	}
+
+	return(0);
 }
 
 
@@ -323,6 +348,7 @@ void setup_screen()
 	noecho();
 	cbreak();
 	keypad(stdscr, TRUE);
+	timeout(20); //ms
 
 	print_interactive_commands();
 }
@@ -438,9 +464,6 @@ bool key_pressed_action(int ch)
 
 void *run_worker_thread(void *arg)
 {
-	int *pretval = new int;
-	*pretval = 0;
-
 	try
 	{
 		//Copy current options:
@@ -474,14 +497,19 @@ void *run_worker_thread(void *arg)
 	}
 	catch (std::runtime_error err)
 	{
-		std::cerr << "Error: " << err.what() << std::endl;
-		*pretval = -1;
+		exc_ptr = std::current_exception();
+		pthread_mutex_lock(&quit_flag_mutex);
+		quit_flag = true;
+		pthread_mutex_unlock(&quit_flag_mutex);
 	}
 	catch (std::exception err)
 	{
-		std::cerr << "Error: " << err.what() << std::endl;
-		*pretval = -1;
+		exc_ptr = std::current_exception();
+		pthread_mutex_lock(&quit_flag_mutex);
+		quit_flag = true;
+		pthread_mutex_unlock(&quit_flag_mutex);
 	}
 
-	pthread_exit(pretval);
+	pthread_exit(nullptr);
 }
+
