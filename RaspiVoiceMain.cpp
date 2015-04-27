@@ -14,13 +14,16 @@
 
 #include <iostream>
 #include <thread>
-#include <iostream>
 #include <cmath>
 #include <cinttypes>
 #include <unistd.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <ncurses.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/input.h>
 
 #include "printtime.h"
 #include "RaspiVoice.h"
@@ -29,9 +32,14 @@ void *run_worker_thread(void *arg);
 void setup_screen(void);
 void print_interactive_commands(void);
 bool key_pressed_action(int ch);
+bool key_event_action(int event_code);
+void daemon_startup(void);
+bool grab_keyboard(std::string bus_device_id);
+bool speak(std::string text);
 
 RaspiVoiceOptions rvopt, rvopt_defaults;
 pthread_mutex_t rvopt_mutex;
+int fevdev = -1;
 
 bool quit_flag = false;
 pthread_mutex_t quit_flag_mutex;
@@ -75,6 +83,9 @@ int main(int argc, char *argv[])
 	rvopt.speed_of_sound_m_s = 340;
 	rvopt.acoustical_size_of_head_m = 0.20;
 	rvopt.mute = false;
+	rvopt.daemon = false;
+	rvopt.grab_keyboard = "";
+	rvopt.speak = false;
 
 	static struct option long_options[] =
 	{
@@ -103,20 +114,23 @@ int main(int argc, char *argv[])
 		{ "freq_highest",		required_argument,	0, 'h' },
 		{ "total_time_s",		required_argument,	0, 't' },
 		{ "use_exponential",	required_argument,	0, 'x' },
-		{ "use_delay",			required_argument,	0, 'd' },
+		{ "use_delay",			required_argument,	0, 'y' },
 		{ "use_fade",			required_argument,	0, 'F' },
 		{ "use_diffraction",	required_argument,	0, 'D' },
 		{ "use_bspline",		required_argument,	0, 'N' },
-		{ "sample_freq_Hz",		required_argument,	0, 'S' },
+		{ "sample_freq_Hz",		required_argument,	0, 'Z' },
 		{ "threshold",			required_argument,	0, 'T' },
 		{ "use_stereo",			required_argument,  0, 'O' },
+		{ "daemon",				no_argument,		0, 'd' },
+		{ "grab_keyboard",		required_argument,	0, 'g' },
+		{ "speak",				no_argument,		0, 'S' },
 		{ 0, 0, 0, 0 }
 	};
 
 	//Retrieve command line options:
 	int option_index = 0;
 	int opt;
-	while ((opt = getopt_long_only(argc, argv, "r:c:i:o:a:pI:vnf:R:e:B:C:b:z:mE:G:l:h:t:x:d:F:D:N:S:T:O:", long_options, &option_index)) != -1)
+	while ((opt = getopt_long_only(argc, argv, "r:c:i:o:a:pI:vnf:R:e:B:C:b:z:mE:G:l:h:t:x:y:d:F:D:N:Z:T:O:dg:S", long_options, &option_index)) != -1)
 	{
 		switch (opt)
 		{
@@ -173,7 +187,7 @@ int main(int argc, char *argv[])
 			case 'x':
 				rvopt.use_exponential = (atoi(optarg) != 0);
 				break;
-			case 'd':
+			case 'y':
 				rvopt.use_delay = (atoi(optarg) != 0);
 				break;
 			case 'F':
@@ -206,7 +220,7 @@ int main(int argc, char *argv[])
 			case 'N':
 				rvopt.use_bspline = (atoi(optarg) != 0);
 				break;
-			case 'S':
+			case 'Z':
 				rvopt.sample_freq_Hz = atof(optarg);
 				break;
 			case 'T':
@@ -214,6 +228,15 @@ int main(int argc, char *argv[])
 				break;
 			case 'O':
 				rvopt.use_stereo = (atoi(optarg) != 0);
+				break;
+			case 'd':
+				rvopt.daemon = true;
+				break;
+			case 'g':
+				rvopt.grab_keyboard = optarg;
+				break;
+			case 'S':
+				rvopt.speak = true;
 				break;
 			case '?':
 				std::cout << "Type raspivoice --help for available options." << std::endl;
@@ -236,12 +259,15 @@ int main(int argc, char *argv[])
 		std::cout << std::endl;
 		std::cout << "Options [defaults]: " << std::endl;
 		std::cout << "    --help\t\t\t\tThis help text" << std::endl;
+		std::cout << "-d  --daemon\t\t\t\tDaemon mode (run in background)" << std::endl;
 		std::cout << "-r, --rows=[64]\t\t\t\tNumber of rows, i.e. vertical (frequency) soundscape resolution (ignored if test image is used)" << std::endl;
 		std::cout << "-c, --columns=[178]\t\t\tNumber of columns, i.e. horizontal (time) soundscape resolution (ignored if test image is used)" << std::endl;
 		std::cout << "-s, --image_source=[1]\t\t\tImage source: 0 for image file, 1 for RaspiCam, 2 for 1st USB camera, 3 for 2nd USB camera..." << std::endl;
 		std::cout << "-i, --input_filename=[]\t\t\tPath to image file (bmp,jpg,png,ppm,tif). Reread every frame. Static test image is used if empty." << std::endl; 
 		std::cout << "-o, --output_filename=[]\t\tPath to output file (wav). Written every frame if not muted." << std::endl;
 		std::cout << "-a, --audio_device=[default]\t\tAudio output device, type aplay -L to get list" << std::endl;
+		std::cout << "-S, --speak\t\t\t\tSpeak out option changes (espeak)." << std::endl;
+		std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number 0, 1, 2... from /dev/input/event*" << std::endl;
 		std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
 		std::cout << "-v, --verbose\t\t\t\tVerbose outputs." << std::endl;
 		std::cout << "-n, --negative_image\t\t\tSwap bright and dark." << std::endl;
@@ -265,9 +291,30 @@ int main(int argc, char *argv[])
 		std::cout << "-F, --use_fade=[1]" << std::endl;
 		std::cout << "-D  --use_diffraction=[1]" << std::endl;
 		std::cout << "-N  --use_bspline=[1]" << std::endl;
-		std::cout << "-S  --sample_freq_Hz=[48000]" << std::endl;
+		std::cout << "-Z  --sample_freq_Hz=[48000]" << std::endl;
 		std::cout << std::endl;
 		return 0;
+	}
+
+	if (rvopt.daemon)
+	{
+		std::cout << "raspivoice daemon started." << std::endl;
+		daemon_startup();
+	}
+
+	if (rvopt.grab_keyboard != "")
+	{
+		if (!rvopt.daemon)
+		{
+			std::cerr << "Grab keyboard device is only possible in daemon mode." << std::endl;
+			return -1;
+		}
+
+		if (!grab_keyboard(rvopt.grab_keyboard))
+		{
+			std::cerr << "Cannot grab keyboard device: " << rvopt.grab_keyboard << "." << std::endl;
+			return -1;
+		}
 	}
 
 	//Start Program in worker thread:
@@ -278,10 +325,11 @@ int main(int argc, char *argv[])
 	pthread_mutex_init(&rvopt_mutex, NULL);
 	if (pthread_create(&thr, NULL, run_worker_thread, NULL))
 	{
-		throw (std::runtime_error("Error setting up thread"));
+		std::cerr << "Error setting up thread." << std::endl;
+		return -1;
 	}
 
-	if (!rvopt_defaults.verbose)
+	if ((!rvopt_defaults.verbose) && (!rvopt_defaults.daemon))
 	{
 		//Show interactive screen:
 		setup_screen();
@@ -307,7 +355,7 @@ int main(int argc, char *argv[])
 		refresh();
 		endwin();
 	}
-	else
+	else if ((rvopt_defaults.verbose) && (!rvopt_defaults.daemon))
 	{
 		//Show debug messages:
 		std::cout << "Verbose mode on, interactive mode disabled." << std::endl;
@@ -318,6 +366,39 @@ int main(int argc, char *argv[])
 		quit_flag = true;
 		pthread_mutex_unlock(&quit_flag_mutex);
 	}
+	else if (rvopt.grab_keyboard != "")
+	{
+		struct input_event ev[64];
+		bool quit = false;
+		while (!quit)
+		{
+			int rd;
+			if ((rd = read(fevdev, ev, sizeof(struct input_event) * 64)) < sizeof(struct input_event))
+			{
+				break;
+			}
+
+			int value = ev[0].value;
+			if (value != ' ' && ev[1].value == 1 && ev[1].type == EV_KEY) //value=1: key press, value=0 key release
+			{
+				quit = key_event_action(ev[1].code);
+			}
+
+			pthread_mutex_lock(&quit_flag_mutex);
+			if (quit_flag)
+			{
+				quit = true;
+			}
+			pthread_mutex_unlock(&quit_flag_mutex);
+		}
+
+		if (fevdev != -1)
+		{
+			ioctl(fevdev, EVIOCGRAB, 0); //Release grabbed keyboard
+			close(fevdev);
+		}
+	}
+
 
 	//Wait for worker thread:
 	pthread_join(thr, nullptr);
@@ -379,15 +460,17 @@ bool key_pressed_action(int ch)
 	rvopt_local = rvopt;
 	pthread_mutex_unlock(&rvopt_mutex);
 
-	printw("Key pressed: %c\n", ch);
-
+	std::stringstream state_str;
+	bool quit = false;
 	switch (ch)
 	{
 		case '0':
 			rvopt_local.mute = !rvopt_local.mute;
+			state_str << ((rvopt_local.mute) ? "muted on": "muted off");
 			break;
 		case '1':
 			rvopt_local.negative_image = !rvopt_local.negative_image;
+			state_str << ((rvopt_local.negative_image) ? "negative image on" : "negative image off");
 			break;
 		case '2':
 			rvopt_local.zoom *= 2.0;
@@ -395,9 +478,11 @@ bool key_pressed_action(int ch)
 			{
 				rvopt_local.zoom = 1.0;
 			}
+			state_str << "zoom factor" << rvopt_local.zoom;
 			break;
 		case '3':
 			rvopt_local.blinders = (rvopt_local.blinders == 0) ? (rvopt_local.columns / 4) : 0;
+			state_str << (rvopt_local.blinders == 0) ? "blinders off": "blinders on";
 			break;
 		case '4':
 			rvopt_local.edge_detection_opacity += 0.5;
@@ -405,6 +490,7 @@ bool key_pressed_action(int ch)
 			{
 				rvopt_local.edge_detection_opacity = 0.0;
 			}
+			state_str << "edge detection " << rvopt_local.edge_detection_opacity;
 			break;
 		case '5':
 			rvopt_local.threshold += (int)(0.25 * 255);
@@ -412,19 +498,23 @@ bool key_pressed_action(int ch)
 			{
 				rvopt_local.threshold = 0;
 			}
+			state_str << "threshold " << rvopt_local.threshold;
 			break;
 		case '6':
 			if (rvopt_local.brightness == 0)
 			{
 				rvopt_local.brightness = 100;
+				state_str << "brightness high";
 			}
 			else if (rvopt_local.brightness > 0)
 			{
 				rvopt_local.brightness = -100;
+				state_str << "brightness low";
 			}
 			else
 			{
 				rvopt_local.brightness = 0;
+				state_str << "brightness medium";
 			}
 			break;
 		case '7':
@@ -433,23 +523,34 @@ bool key_pressed_action(int ch)
 			{
 				rvopt_local.contrast = 1.0;
 			}
+			state_str << "contrast factor " << rvopt_local.contrast;
 			break;
 		case '8':
 			rvopt_local.foveal_mapping = !rvopt_local.foveal_mapping;
+			state_str << (rvopt_local.foveal_mapping ? "foveal mapping on": "foveal mapping off");
 			break;
 		case KEY_BACKSPACE:
 		case KEY_DC:
 		case 'J':
 		case ',':
+		case '.':
 			rvopt_local = rvopt_defaults;
+			state_str << "default options";
 			break;
 		case 'q':
 		case 27: // ESC key
 			pthread_mutex_lock(&quit_flag_mutex);
 			quit_flag = true;
 			pthread_mutex_unlock(&quit_flag_mutex);
-			return true; //quit signal
+			state_str << "goodbye";
+			quit = true;
 			break;
+	}
+
+	//Speak state_str?
+	if (rvopt_local.speak)
+	{
+		speak(state_str.str());
 	}
 
 	//Set new options:
@@ -457,10 +558,44 @@ bool key_pressed_action(int ch)
 	rvopt = rvopt_local;
 	pthread_mutex_unlock(&rvopt_mutex);
 
-	//No quit signal:
-	return false;
+	return quit;
 }
 
+
+bool key_event_action(int event_code)
+{
+	int ch = 0;
+	switch (event_code)
+	{
+		case KEY_KP0: ch = '0';	break;
+		case KEY_KP1: ch = '1';	break;
+		case KEY_KP2: ch = '2';	break;
+		case KEY_KP3: ch = '3';	break;
+		case KEY_KP4: ch = '4';	break;
+		case KEY_KP5: ch = '5';	break;
+		case KEY_KP6: ch = '6';	break;
+		case KEY_KP7: ch = '7';	break;
+		case KEY_KP8: ch = '8';	break;
+		case KEY_KP9: ch = '9';	break;
+		case KEY_KPDOT: ch = '.';	break;
+		case KEY_KPMINUS: ch = '-';	break;
+		case KEY_KPPLUS: ch = '+';	break;
+		case KEY_KPASTERISK: ch = '*';	break;
+		case KEY_KPSLASH: ch = '/';	break;
+		case KEY_KPENTER: ch = 13;	break;
+		case KEY_KPEQUAL: ch = '=';	break;
+		case KEY_KPCOMMA: ch = ',';	break;
+		case KEY_KPJPCOMMA: ch = ',';	break;
+	}
+
+	bool quit = false;
+	if (ch != 0)
+	{
+		 quit = key_pressed_action(ch);
+	}
+	
+	return quit;
+}
 
 void *run_worker_thread(void *arg)
 {
@@ -513,3 +648,60 @@ void *run_worker_thread(void *arg)
 	pthread_exit(nullptr);
 }
 
+void daemon_startup(void)
+{
+	pid_t pid, sid;
+
+	pid = fork();
+	if (pid < 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+	if (pid > 0)
+	{
+		exit(EXIT_SUCCESS);
+	}
+
+	umask(0);
+
+	sid = setsid();
+	if (sid < 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+
+	if ((chdir("/")) < 0)
+	{
+		exit(EXIT_FAILURE);
+	}
+
+	close(STDOUT_FILENO);
+	close(STDERR_FILENO);
+}
+
+bool grab_keyboard(std::string bus_device_id)
+{
+	int device_id = atoi(bus_device_id.c_str());
+
+	std::string devpath("/dev/input/event" + bus_device_id);
+
+	fevdev = open(devpath.c_str(), O_RDONLY);
+	if (fevdev == -1)
+	{
+		return false;
+	}
+
+	if (ioctl(fevdev, EVIOCGRAB, 1) != 0) //grab keyboard
+	{
+		return false;
+	}
+
+	return true;
+}
+
+bool speak(std::string text)
+{
+	std::string command = "espeak --stdout \"" + text + "\" | aplay -q -D" + rvopt_defaults.audio_device;
+	int res = system(command.c_str());
+	return (res == 0);
+}

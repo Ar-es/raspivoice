@@ -43,6 +43,9 @@ typedef struct
 	float speed_of_sound_m_s;
 	float acoustical_size_of_head_m;
 	bool mute;
+	bool daemon;
+	std::string grab_keyboard;
+	bool speak;
 } RaspiVoiceOptions;
 
 class RaspiVoice
