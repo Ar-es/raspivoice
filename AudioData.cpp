@@ -20,7 +20,7 @@ AudioData::AudioData(int sample_freq_Hz, int sample_count, bool use_stereo) :
 	sample_count(sample_count),
 	use_stereo(use_stereo),
 	Verbose(false),
-	DeviceName("default"),
+	CardNumber(0),
 	samplebuffer(std::vector<uint16_t>((use_stereo ? 2 : 1) * sample_count))
 {
 }
@@ -73,7 +73,7 @@ void AudioData::Play()
 	int bytes_per_sample = (use_stereo ? 4 : 2);
 
 	std::stringstream cmd;
-	cmd << "aplay --nonblock -r" << sample_freq_Hz << " -c" << (use_stereo ? 2 : 1) << " -fS16_LE -D" << DeviceName;
+	cmd << "aplay --nonblock -r" << sample_freq_Hz << " -c" << (use_stereo ? 2 : 1) << " -fS16_LE -D hw:" << CardNumber;
 	if (!Verbose)
 	{
 		cmd << " -q";
@@ -88,11 +88,49 @@ void AudioData::Play()
 	pclose(p);
 }
 
-int AudioData::PlayWav(std::string filename, std::string devicename)
+void AudioData::SetVolume(int newvolume)
+{
+	AudioData::SetVolume(newvolume, CardNumber);
+}
+
+int AudioData::PlayWav(std::string filename, int cardnumber)
 {
 	char command[256] = "";
 	int status;
-	snprintf(command, 256, "aplay %s -D%s", filename.c_str(), devicename.c_str());
+	snprintf(command, 256, "aplay %s -D hw:%d", filename.c_str(), cardnumber);
 	status = system(command);
+	return status;
+}
+
+
+int AudioData::SetVolume(int newvolume, int cardnumber)
+{
+	char command[256] = "";
+	int status = 0;
+	snprintf(command, 256, "amixer -c %d controls | grep MIXER | grep Playback | grep Volume | sed s/[^0-9]*//g", cardnumber);
+	//std::cout << command << std::endl;
+	FILE *fp = popen(command, "r");
+	if (fp == nullptr)
+	{
+		return -1;
+	}
+	char buffer[256];
+	char *res;
+	while (!feof(fp) && status == 0)
+		{
+		res = fgets(buffer, sizeof(buffer), fp);
+		if ((res == nullptr) || atoi(res) == 0)
+		{
+			status = -1;
+		}
+		else
+		{
+			int numid = atoi(res);
+			snprintf(command, sizeof(command), "amixer -c %d cset numid=%d %d%% -q", cardnumber, numid, newvolume);
+			//std::cout << command << std::endl;
+			status = system(command);
+		}
+	}
+	pclose(fp);
 	return status;
 }

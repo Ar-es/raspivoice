@@ -31,7 +31,7 @@ make -j 4
 make -j 4 CONFIG=release_rpi2
 
 5. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel by pressing Enter.):
-./Release/raspivoice -s0 -v
+./Release/raspivoice -s 0 -v
 
 6. install to system:
 sudo cp Release/raspivoice /usr/local/bin/

@@ -17,7 +17,7 @@ private:
 	void wl(FILE* fp, uint32_t l);
 
 public:
-	std::string DeviceName;
+	int CardNumber;
 	bool Verbose;
 
 	AudioData(int sample_freq_Hz, int sample_count, bool use_stereo = true);
@@ -27,6 +27,8 @@ public:
 	void SaveToWavFile(std::string filename);
 	
 	void Play();
-	static int PlayWav(std::string filename, std::string devicename = "default");
+	void SetVolume(int newvolume);
+	static int PlayWav(std::string filename, int cardnumber);
+	static int SetVolume(int newvolume, int cardnumber);
 };
 

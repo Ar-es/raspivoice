@@ -14,7 +14,8 @@ typedef struct
 	int image_source;
 	std::string input_filename;
 	std::string output_filename;
-	std::string audio_device;
+	int audio_card;
+	int volume;
 	bool preview;
 	bool use_bw_test_image;
 	bool verbose;

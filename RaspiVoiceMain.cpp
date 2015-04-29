@@ -54,7 +54,8 @@ int main(int argc, char *argv[])
 	rvopt.image_source = 1;
 	rvopt.input_filename = "";
 	rvopt.output_filename = "";
-	rvopt.audio_device = "default";
+	rvopt.audio_card = 0;
+	rvopt.volume = -1;
 	rvopt.preview = false;
 	rvopt.use_bw_test_image = false;
 	rvopt.verbose = false;
@@ -95,7 +96,8 @@ int main(int argc, char *argv[])
 		{ "image_source",		required_argument,	0, 's' },
 		{ "input_filename",		required_argument,  0, 'i' },
 		{ "output_filename",	required_argument,	0, 'o' },
-		{ "audio_device",		required_argument,	0, 'a' },
+		{ "audio_card",			required_argument,	0, 'a' },
+		{ "volume",				required_argument,	0, 'V' },
 		{ "preview",			no_argument,		0, 'p' },
 		{ "use_bw_test_image",	required_argument,	0, 'I' },
 		{ "verbose",			no_argument,		0, 'v' },
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
 	//Retrieve command line options:
 	int option_index = 0;
 	int opt;
-	while ((opt = getopt_long_only(argc, argv, "r:c:i:o:a:pI:vnf:R:e:B:C:b:z:mE:G:l:h:t:x:y:d:F:D:N:Z:T:O:dg:S", long_options, &option_index)) != -1)
+	while ((opt = getopt_long_only(argc, argv, "r:c:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:l:h:t:x:y:d:F:D:N:Z:T:O:dg:S", long_options, &option_index)) != -1)
 	{
 		switch (opt)
 		{
@@ -152,7 +154,10 @@ int main(int argc, char *argv[])
 				rvopt.output_filename = optarg;
 				break;
 			case 'a':
-				rvopt.audio_device = optarg;
+				rvopt.audio_card = atoi(optarg);
+				break;
+			case 'V':
+				rvopt.volume = atoi(optarg);
 				break;
 			case 'p':
 				rvopt.preview = true;
@@ -265,7 +270,8 @@ int main(int argc, char *argv[])
 		std::cout << "-s, --image_source=[1]\t\t\tImage source: 0 for image file, 1 for RaspiCam, 2 for 1st USB camera, 3 for 2nd USB camera..." << std::endl;
 		std::cout << "-i, --input_filename=[]\t\t\tPath to image file (bmp,jpg,png,ppm,tif). Reread every frame. Static test image is used if empty." << std::endl; 
 		std::cout << "-o, --output_filename=[]\t\tPath to output file (wav). Written every frame if not muted." << std::endl;
-		std::cout << "-a, --audio_device=[default]\t\tAudio output device, type aplay -L to get list" << std::endl;
+		std::cout << "-a, --audio_card=[0]\t\tAudio card number (0,1,...), use aplay -l to get list" << std::endl;
+		std::cout << "-V, --volume=[-1]\t\tAudio volume (set by system mixer, 0-100, -1 for no change)" << std::endl;
 		std::cout << "-S, --speak\t\t\t\tSpeak out option changes (espeak)." << std::endl;
 		std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number 0, 1, 2... from /dev/input/event*" << std::endl;
 		std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
@@ -701,7 +707,9 @@ bool grab_keyboard(std::string bus_device_id)
 
 bool speak(std::string text)
 {
-	std::string command = "espeak --stdout \"" + text + "\" | aplay -q -D" + rvopt_defaults.audio_device;
-	int res = system(command.c_str());
+	char command[256] = "";
+	int status;
+	snprintf(command, 256, "espeak --stdout \"%s\" | aplay -q -D hw:", text.c_str(), rvopt_defaults.audio_card);
+	int res = system(command);
 	return (res == 0);
 }

@@ -427,13 +427,19 @@ void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
 	if (!opt.mute)
 	{
 		AudioData &audioData = i2ssConverter->GetAudioData();
-		audioData.DeviceName = opt.audio_device;
+		audioData.CardNumber = opt.audio_card;
 		audioData.Verbose = verbose;
 
 		if (verbose)
 		{
 			printtime("Playing audio");
 		}
+
+		if (opt.volume != -1)
+		{
+			audioData.SetVolume(opt.volume);
+		}
+
 		audioData.Play();
 
 		if (opt.output_filename != "")
