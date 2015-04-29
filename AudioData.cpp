@@ -134,3 +134,13 @@ int AudioData::SetVolume(int newvolume, int cardnumber)
 	pclose(fp);
 	return status;
 }
+
+
+bool AudioData::Speak(std::string text, int cardnumber)
+{
+	char command[256] = "";
+	int status;
+	snprintf(command, 256, "espeak --stdout \"%s\" | aplay -q -D hw:", text.c_str(), cardnumber);
+	int res = system(command);
+	return (res == 0);
+}

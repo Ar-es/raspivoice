@@ -30,5 +30,6 @@ public:
 	void SetVolume(int newvolume);
 	static int PlayWav(std::string filename, int cardnumber);
 	static int SetVolume(int newvolume, int cardnumber);
+	static bool Speak(std::string text, int cardnumber);
 };
 
