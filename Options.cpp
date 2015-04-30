@@ -4,6 +4,8 @@
 
 #include "Options.h"
 
+RaspiVoiceOptions cmdLineOptions;
+
 static struct option long_getopt_options[] =
 {
 	{ "help", no_argument, 0, 'h' },
@@ -93,9 +95,9 @@ RaspiVoiceOptions GetDefaultOptions()
 
 
 //Returns false if program should be aborted, true otherwise.
-bool GetCommandLineOptions(RaspiVoiceOptions &opt, int argc, char *argv[])
+bool SetCommandLineOptions(int argc, char *argv[])
 {
-	opt = GetDefaultOptions();
+	RaspiVoiceOptions opt = GetDefaultOptions();
 
 	//Retrieve command line options:
 	int option_index = 0;
@@ -227,7 +229,15 @@ bool GetCommandLineOptions(RaspiVoiceOptions &opt, int argc, char *argv[])
 		return false;
 	}
 
+	cmdLineOptions = opt;
+
 	return true;
+}
+
+
+RaspiVoiceOptions GetCommandLineOptions()
+{
+	return cmdLineOptions;
 }
 
 
@@ -237,15 +247,15 @@ void ShowHelp()
 	std::cout << "raspivoice {options}" << std::endl;
 	std::cout << std::endl;
 	std::cout << "Options [defaults]: " << std::endl;
-	std::cout << "    --help\t\t\t\tThis help text" << std::endl;
+	std::cout << "-h, --help\t\t\t\tThis help text" << std::endl;
 	std::cout << "-d  --daemon\t\t\t\tDaemon mode (run in background)" << std::endl;
 	std::cout << "-r, --rows=[64]\t\t\t\tNumber of rows, i.e. vertical (frequency) soundscape resolution (ignored if test image is used)" << std::endl;
 	std::cout << "-c, --columns=[178]\t\t\tNumber of columns, i.e. horizontal (time) soundscape resolution (ignored if test image is used)" << std::endl;
 	std::cout << "-s, --image_source=[1]\t\t\tImage source: 0 for image file, 1 for RaspiCam, 2 for 1st USB camera, 3 for 2nd USB camera..." << std::endl;
 	std::cout << "-i, --input_filename=[]\t\t\tPath to image file (bmp,jpg,png,ppm,tif). Reread every frame. Static test image is used if empty." << std::endl;
 	std::cout << "-o, --output_filename=[]\t\tPath to output file (wav). Written every frame if not muted." << std::endl;
-	std::cout << "-a, --audio_card=[0]\t\tAudio card number (0,1,...), use aplay -l to get list" << std::endl;
-	std::cout << "-V, --volume=[-1]\t\tAudio volume (set by system mixer, 0-100, -1 for no change)" << std::endl;
+	std::cout << "-a, --audio_card=[0]\t\t\tAudio card number (0,1,...), use aplay -l to get list" << std::endl;
+	std::cout << "-V, --volume=[-1]\t\t\tAudio volume (set by system mixer, 0-100, -1 for no change)" << std::endl;
 	std::cout << "-S, --speak\t\t\t\tSpeak out option changes (espeak)." << std::endl;
 	std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number 0, 1, 2... from /dev/input/event*" << std::endl;
 	std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;

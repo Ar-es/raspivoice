@@ -45,7 +45,7 @@ typedef struct
 	bool speak;
 } RaspiVoiceOptions;
 
-
 RaspiVoiceOptions GetDefaultOptions(void);
-bool GetCommandLineOptions(RaspiVoiceOptions &opt, int argc, char *argv[]);
+bool SetCommandLineOptions(int argc, char *argv[]);
+RaspiVoiceOptions GetCommandLineOptions();
 void ShowHelp(void);

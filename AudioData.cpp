@@ -67,7 +67,6 @@ void AudioData::SaveToWavFile(std::string filename)
 	fclose(fp);
 }
 
-
 void AudioData::Play()
 {
 	int bytes_per_sample = (use_stereo ? 4 : 2);
@@ -102,7 +101,6 @@ int AudioData::PlayWav(std::string filename, int cardnumber)
 	return status;
 }
 
-
 int AudioData::SetVolume(int newvolume, int cardnumber)
 {
 	char command[256] = "";
@@ -134,7 +132,6 @@ int AudioData::SetVolume(int newvolume, int cardnumber)
 	pclose(fp);
 	return status;
 }
-
 
 bool AudioData::Speak(std::string text, int cardnumber)
 {
