@@ -100,7 +100,7 @@ bool GetCommandLineOptions(RaspiVoiceOptions &opt, int argc, char *argv[])
 	//Retrieve command line options:
 	int option_index = 0;
 	int cmdline_opt;
-	while ((cmdline_opt = getopt_long_only(argc, argv, "hr:c:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:dg:S", long_getopt_options, &option_index)) != -1)
+	while ((cmdline_opt = getopt_long_only(argc, argv, "hr:c:s:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:dg:S", long_getopt_options, &option_index)) != -1)
 	{
 		switch (cmdline_opt)
 		{

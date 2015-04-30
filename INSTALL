@@ -7,7 +7,7 @@ And Raspberry Pi 2 Model B, running Raspbian, Linux raspberrypi 3.18.7-v7+ #755 
 
 2. install necessary packages:
 
-sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8 libncurses5-dev
+sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8 libncurses5-dev espeak
 
 3. install raspicam: (follow http://www.uco.es/investiga/grupos/ava/node/40 in case of errors):
 
@@ -31,7 +31,7 @@ make -j 4
 make -j 4 CONFIG=release_rpi2
 
 5. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel by pressing Enter.):
-./Release/raspivoice -s 0 -v
+./Release/raspivoice -s0 -v
 
 6. install to system:
 sudo cp Release/raspivoice /usr/local/bin/
@@ -43,14 +43,16 @@ Using raspivoice:
 - Show command line options:
 raspivoice --help
 
-- Choose camera:
-Default is USB camera 0 (check with lsusb if connected)
-
+- Choose camera/image input:
 Test image (Ascii art in config.h) (warning: most options do not work with the test image):
 raspivoice -s0
 
-Raspberry Pi camera:
+Raspberry Pi camera (default):
 raspivoice -s1
+
+USB camera:
+raspivoice -s2
+Chooses camera with device number 0. (check with lsusb if connected)
 
 - Choose audio output:
 Default is analog line out (3.5mm headphone jack). Might be noisy, USB audio is preferred.
@@ -58,29 +60,29 @@ if no audio via headphone jack: sudo raspi-config -> Advanced Options -> A9 Audi
 
 If USB audio output is connected (e.g. USB headphones):
 List devices:
-aplay -L
+aplay -l
 
 Output might look like this:
-null
-    Discard all samples (playback) or generate zero samples (capture)
-default:CARD=ALSA
-    bcm2835 ALSA, bcm2835 ALSA
-    Default Audio Device
-sysdefault:CARD=ALSA
-    bcm2835 ALSA, bcm2835 ALSA
-    Default Audio Device
-default:CARD=Headset
-    Logitech Wireless Headset, USB Audio
-    Default Audio Device
-sysdefault:CARD=Headset
-    Logitech Wireless Headset, USB Audio
-    Default Audio Device
-front:CARD=Headset,DEV=0
-    Logitech Wireless Headset, USB Audio
-    Front speakers
+**** List of PLAYBACK Hardware Devices ****
+card 0: ALSA [bcm2835 ALSA], device 0: bcm2835 ALSA [bcm2835 ALSA]
+  Subdevices: 8/8
+  Subdevice #0: subdevice #0
+  Subdevice #1: subdevice #1
+  Subdevice #2: subdevice #2
+  Subdevice #3: subdevice #3
+  Subdevice #4: subdevice #4
+  Subdevice #5: subdevice #5
+  Subdevice #6: subdevice #6
+  Subdevice #7: subdevice #7
+card 0: ALSA [bcm2835 ALSA], device 1: bcm2835 ALSA [bcm2835 IEC958/HDMI]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+card 1: Device [Generic USB Audio Device], device 0: USB Audio [USB Audio]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
 
-For example, choose headset default:
-raspivoice -a default:CARD=Headset
+For example, choose card 1:
+raspivoice -a1
 
 - Show preview window:
 If monitor is connected to raspberry pi, start X windows graphical user interface (startx), and run from terminal:
