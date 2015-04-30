@@ -3,6 +3,7 @@
 #include <linux/input.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "Options.h"
 #include "KeyboardInput.h"
