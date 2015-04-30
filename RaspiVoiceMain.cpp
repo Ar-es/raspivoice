@@ -187,14 +187,14 @@ void main_loop(KeyboardInput &keyboardInput, bool use_ncurses)
 
 void *run_worker_thread(void *arg)
 {
+	//Copy current options:
+	RaspiVoiceOptions rvopt_local;
+	pthread_mutex_lock(&rvopt_mutex);
+	rvopt_local = rvopt;
+	pthread_mutex_unlock(&rvopt_mutex);
+
 	try
 	{
-		//Copy current options:
-		RaspiVoiceOptions rvopt_local;
-		pthread_mutex_lock(&rvopt_mutex);
-		rvopt_local = rvopt;
-		pthread_mutex_unlock(&rvopt_mutex);
-
 		//Init:
 		RaspiVoice raspiVoice(rvopt_local);
 
@@ -221,17 +221,15 @@ void *run_worker_thread(void *arg)
 	catch (std::runtime_error err)
 	{
 		exc_ptr = std::current_exception();
+		if (rvopt_local.verbose)
+		{
+			std::cout << err.what() << std::endl;
+		}
 		pthread_mutex_lock(&quit_flag_mutex);
 		quit_flag = true;
 		pthread_mutex_unlock(&quit_flag_mutex);
 	}
-	catch (std::exception err)
-	{
-		exc_ptr = std::current_exception();
-		pthread_mutex_lock(&quit_flag_mutex);
-		quit_flag = true;
-		pthread_mutex_unlock(&quit_flag_mutex);
-	}
+	
 
 	pthread_exit(nullptr);
 }
