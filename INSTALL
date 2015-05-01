@@ -91,4 +91,3 @@ raspivoice -p
 
 Otherwise, ssh -Y to raspberry pi. Windows: Use Xming and putty, set Connection->SSH->X11->Enable X11 forwarding.
 
-The warning message "(RaspiVoice Preview:5666): GLib-GObject-WARNING **: Attempt to add property GtkSettings::gtk-label-select-on-focus after class was initialised" can be ignored.

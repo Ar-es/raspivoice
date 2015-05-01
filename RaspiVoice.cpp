@@ -187,6 +187,7 @@ void RaspiVoice::initUsbCam()
 	}
 
 	cap.open(cam_id);
+
 	if (!cap.isOpened())
 	{
 		throw(std::runtime_error("Could not open camera."));
@@ -409,7 +410,7 @@ void RaspiVoice::processImage(cv::Mat rawImage)
 
 }
 
-void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
+void RaspiVoice::GrabAndProcessFrame(RaspiVoiceOptions opt)
 {
 	//Set new options. Options that have been copied to RaspiVoice:: fields in constructor are unaffected.
 	this->opt = opt;
@@ -423,6 +424,14 @@ void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
 		printtime("vOICe algorithm process start");
 	}
 	i2ssConverter->Process(*image);
+}
+
+void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
+{
+	if (opt.quit)
+	{
+		return;
+	}
 
 	if (!opt.mute)
 	{

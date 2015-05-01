@@ -38,6 +38,7 @@ private:
 public:
 	RaspiVoice(RaspiVoiceOptions opt);
 	~RaspiVoice();
+	void GrabAndProcessFrame(RaspiVoiceOptions opt);
 	void PlayFrame(RaspiVoiceOptions opt);
 };
 

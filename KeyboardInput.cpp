@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 #include "Options.h"
 #include "KeyboardInput.h"
@@ -195,10 +196,11 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 				break;
 			case ',':
 			case '.':
+			case 263: //Backspace
 				state_str << "period: default options";
 				break;
 			case 'q':
-			case 27:
+			case 27: //ESC
 				state_str << "escape: quit";
 				break;
 		}
@@ -279,6 +281,7 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 				break;
 			case ',':
 			case '.':
+			case 263:
 				opt = GetCommandLineOptions();
 				state_str << "default options";
 				break;
@@ -293,7 +296,10 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 	//Speak state_str?
 	if ((opt.speak) && (state_str.str() != ""))
 	{
-		AudioData::Speak(state_str.str(), opt.audio_card);
+		if (!AudioData::Speak(state_str.str(), opt.audio_card))
+		{
+			throw(std::runtime_error("Error calling Speak(). Use verbose mode for more info."));
+		}
 	}
 
 	return;
@@ -388,12 +394,13 @@ int KeyboardInput::keyEventMap(int event_code)
 		case KEY_KPEQUAL:
 			ch = '=';
 			break;
+		case KEY_DOT:
 		case KEY_KPDOT:
 		case KEY_KPCOMMA:
 		case KEY_KPJPCOMMA:
 		case KEY_BACKSPACE:
 		case KEY_DC:
-			ch = ',';
+			ch = '.';
 			break;
 		case KEY_KPPLUS:
 		case KEY_VOLUMEUP:
@@ -423,7 +430,7 @@ void KeyboardInput::PrintInteractiveCommands()
 	printw("6: Brightness [low, normal, high]\n");
 	printw("7: Contrast [x1, x2, x3]\n");
 	printw("8: Foveal mapping [off, on]\n");
-	printw("[Backspace]: Restore defaults\n");
+	printw(".: Restore defaults\n");
 	printw("q, [Escape]: Quit\n");
 }
 

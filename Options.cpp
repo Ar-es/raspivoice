@@ -91,6 +91,7 @@ RaspiVoiceOptions GetDefaultOptions()
 	opt.speak = false;
 
 	opt.quit = false;
+
 	return opt;
 }
 

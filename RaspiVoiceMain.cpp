@@ -21,6 +21,7 @@
 #include <ncurses.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include "printtime.h"
 #include "Options.h"
@@ -28,12 +29,19 @@
 #include "KeyboardInput.h"
 
 void *run_worker_thread(void *arg);
-void setup_screen(void);
+bool setup_screen(void);
+void close_screen(void);
 void daemon_startup(void);
 void main_loop(KeyboardInput &keyboardInput, bool use_ncurses);
 
 RaspiVoiceOptions rvopt;
 pthread_mutex_t rvopt_mutex;
+
+int newfd = -1;
+FILE *fd = NULL;
+SCREEN *scr = NULL;
+int saved_stdout = -1;
+int saved_stderr = -1;
 
 std::exception_ptr exc_ptr;
 
@@ -69,14 +77,14 @@ int main(int argc, char *argv[])
 	if ((!cmdline_opt.verbose) && (!cmdline_opt.daemon))
 	{
 		//Show interactive screen:
-		setup_screen();
-		keyboardInput.PrintInteractiveCommands();
+		if (setup_screen())
+		{
+			keyboardInput.PrintInteractiveCommands();
 
-		main_loop(keyboardInput, true); //with ncurses
+			main_loop(keyboardInput, true); //with ncurses
 
-		//quit ncurses:
-		refresh();
-		endwin();
+			close_screen();
+		}
 	}
 	else if ((cmdline_opt.verbose) && (!cmdline_opt.daemon))
 	{
@@ -94,18 +102,20 @@ int main(int argc, char *argv[])
 		if (!cmdline_opt.daemon)
 		{
 			std::cerr << "Grab keyboard device is only possible in daemon mode." << std::endl;
-			return -1;
 		}
-
-		if (!keyboardInput.GrabKeyboard(cmdline_opt.grab_keyboard))
+		else
 		{
-			std::cerr << "Cannot grab keyboard device: " << cmdline_opt.grab_keyboard << "." << std::endl;
-			return -1;
+			if (!keyboardInput.GrabKeyboard(cmdline_opt.grab_keyboard))
+			{
+				std::cerr << "Cannot grab keyboard device: " << cmdline_opt.grab_keyboard << "." << std::endl;
+			}
+			else
+			{
+				main_loop(keyboardInput, false); //without ncurses
+
+				keyboardInput.ReleaseKeyboard();
+			}
 		}
-
-		main_loop(keyboardInput, false); //without ncurses
-
-		keyboardInput.ReleaseKeyboard();
 	}
 
 	//Wait for worker thread:
@@ -128,15 +138,82 @@ int main(int argc, char *argv[])
 	return(0);
 }
 
-void setup_screen()
+bool setup_screen()
 {
 	//ncurses screen setup:
-	initscr();
+	//initscr();
+	fd = fopen("/dev/tty", "r+");
+	if (fd == NULL)
+	{
+		std::cerr << "Cannot open screen." << std::endl;
+		return false;
+	}
+	scr = newterm(NULL, fd, fd);
+	if (scr == NULL)
+	{
+		std::cerr << "Cannot open screen." << std::endl;
+		close_screen();
+		return false;
+	}
+
+	newfd = open("/dev/null", O_WRONLY);
+	if (newfd == -1)
+	{
+		std::cerr << "Cannot open screen." << std::endl;
+		close_screen();
+		return false;
+	}
+
+	fflush(stdout);
+	fflush(stderr);
+
+	saved_stdout = dup(fileno(stdout));
+	saved_stderr = dup(fileno(stderr));
+
+	dup2(newfd, fileno(stdout));
+	dup2(newfd, fileno(stderr));
+	setvbuf(stdout, NULL, _IONBF, 0);
+
 	clear();
 	noecho();
 	cbreak();
 	keypad(stdscr, TRUE);
 	timeout(20); //ms
+
+	return true;
+}
+
+void close_screen()
+{
+	//quit ncurses:
+	refresh();
+
+	endwin();
+
+	if (saved_stdout != -1)
+	{
+		dup2(saved_stdout, fileno(stdout));
+		close(saved_stdout);
+	}
+	if (saved_stderr != -1)
+	{
+		dup2(saved_stderr, fileno(stderr));
+		close(saved_stderr);
+	}
+
+	if (newfd != -1)
+	{
+		close(newfd);
+	}
+	if (scr != NULL)
+	{
+		delscreen(scr);
+	}
+	if (fd != NULL)
+	{
+		fclose(fd);
+	}
+
 }
 
 void main_loop(KeyboardInput &keyboardInput, bool use_ncurses)
@@ -193,13 +270,21 @@ void *run_worker_thread(void *arg)
 
 		while (!rvopt_local.quit)
 		{
+			//Read one frame:
+			raspiVoice.GrabAndProcessFrame(rvopt_local);
+
 			//Copy any new options:
 			pthread_mutex_lock(&rvopt_mutex);
 			rvopt_local = rvopt;
 			pthread_mutex_unlock(&rvopt_mutex);
 
-			//Read and play one frame:
+			//Play frame:
 			raspiVoice.PlayFrame(rvopt_local);
+
+			//Copy any new options:
+			pthread_mutex_lock(&rvopt_mutex);
+			rvopt_local = rvopt;
+			pthread_mutex_unlock(&rvopt_mutex);
 		}
 	}
 	catch (std::runtime_error err)
