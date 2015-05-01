@@ -75,7 +75,7 @@ void AudioData::Play()
 	int bytes_per_sample = (use_stereo ? 4 : 2);
 
 	std::stringstream cmd;
-	cmd << "aplay --nonblock -r" << sample_freq_Hz << " -c" << (use_stereo ? 2 : 1) << " -fS16_LE -D hw:" << CardNumber;
+	cmd << "aplay --nonblock -r" << sample_freq_Hz << " -c" << (use_stereo ? 2 : 1) << " -fS16_LE -D plughw:" << CardNumber;
 	if (!Verbose)
 	{
 		cmd << " -q";
@@ -142,7 +142,7 @@ bool AudioData::Speak(std::string text, int cardnumber)
 {
 	char command[1023] = "";
 	int status;
-	snprintf(command, 1023, "espeak --stdout \"%s\" | aplay -fS16_LE -I -c2 -D hw:%d --file-type raw /dev/null", text.c_str(), cardnumber);
+	snprintf(command, 1023, "espeak --stdout \"%s\" | aplay -q -D plughw:%d", text.c_str(), cardnumber);
 	pthread_mutex_lock(&audio_mutex);
 	int res = system(command);
 	pthread_mutex_unlock(&audio_mutex);
