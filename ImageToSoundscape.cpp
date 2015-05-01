@@ -40,7 +40,7 @@ ImageToSoundscapeConverter::ImageToSoundscapeConverter(int rows, int columns, do
 	samplesPerColumn((uint32_t)(sampleCount / columns)),
 	timePerSample_s(1.0 / sample_freq_Hz),
 	scale(0.5 / sqrt((float)rows)),
-	audioData(AudioData(sample_freq_Hz, sampleCount, use_stereo)),
+	audioData(0, sample_freq_Hz, sampleCount, use_stereo),
 	omega(std::vector<float>(rows)),
 	phi0(std::vector<float>(rows)),
 	waveformCacheLeftChannel(std::vector<float>(sampleCount*rows)),

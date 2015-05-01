@@ -96,6 +96,14 @@ int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 			new_index = 0;
 		}
 	}
+	else if (changevalue == -2)
+	{
+		new_index = i - 1;
+		if (new_index < 0)
+		{
+			new_index = maxindex;
+		}
+	}
 
 	return new_index;
 }
@@ -110,6 +118,7 @@ void KeyboardInput::cycleValues(float &current_value, std::vector<float> value_l
 			return;
 		}
 	}
+	current_value = value_list[0];
 }
 
 void KeyboardInput::cycleValues(int &current_value, std::vector<int> value_list, int changevalue)
@@ -122,6 +131,7 @@ void KeyboardInput::cycleValues(int &current_value, std::vector<int> value_list,
 			return;
 		}
 	}
+	current_value = value_list[0];
 }
 
 void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
@@ -131,6 +141,7 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 	bool option_changed = false;
 	int changevalue = 2; //-1: decrease value, 0: no change, 1: increase value, 2: cycle values
 	std::stringstream state_str;
+	AudioData audioData(opt.audio_card);
 
 	//Menu navigation keys:
 	switch (ch)
@@ -264,19 +275,13 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 				state_str << (opt.foveal_mapping ? "foveal mapping on" : "foveal mapping off");
 				break;
 			case '+':
-				opt.volume += 5;
-				if (opt.volume > 100)
-				{
-					opt.volume = 100;
-				}
+				cycleValues(opt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? 1: -1);
+				audioData.SetVolume(opt.volume);
 				state_str << "Volume up ";
 				break;
 			case '-':
-				opt.volume -= 5;
-				if (opt.volume < 0)
-				{
-					opt.volume = 0;
-				}
+				cycleValues(opt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? -1 : 1);
+				audioData.SetVolume(opt.volume);
 				state_str << "Volume down ";
 				break;
 			case ',':
@@ -296,7 +301,7 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 	//Speak state_str?
 	if ((opt.speak) && (state_str.str() != ""))
 	{
-		if (!AudioData::Speak(state_str.str(), opt.audio_card))
+		if (!audioData.Speak(state_str.str()))
 		{
 			throw(std::runtime_error("Error calling Speak(). Use verbose mode for more info."));
 		}

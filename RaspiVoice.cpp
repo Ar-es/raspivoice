@@ -444,11 +444,6 @@ void RaspiVoice::PlayFrame(RaspiVoiceOptions opt)
 			printtime("Playing audio");
 		}
 
-		if (opt.volume != -1)
-		{
-			audioData.SetVolume(opt.volume);
-		}
-
 		audioData.Play();
 
 		if (opt.output_filename != "")

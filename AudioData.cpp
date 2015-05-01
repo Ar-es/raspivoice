@@ -17,13 +17,19 @@
 
 pthread_mutex_t AudioData::audio_mutex;
 
-AudioData::AudioData(int sample_freq_Hz, int sample_count, bool use_stereo) :
+AudioData::AudioData(int card_number, int sample_freq_Hz, int sample_count, bool use_stereo) :
 	sample_freq_Hz(sample_freq_Hz),
 	sample_count(sample_count),
 	use_stereo(use_stereo),
 	Verbose(false),
-	CardNumber(0),
-	samplebuffer(std::vector<uint16_t>((use_stereo ? 2 : 1) * sample_count))
+	CardNumber(card_number),
+	samplebuffer(std::vector<uint16_t>((use_stereo ? 2 : 1) * sample_count)),
+	volume(-1),
+	newvolume(-1)
+{
+}
+
+void AudioData::Init()
 {
 	pthread_mutex_init(&audio_mutex, NULL);
 }
@@ -72,6 +78,8 @@ void AudioData::SaveToWavFile(std::string filename)
 
 void AudioData::Play()
 {
+	updateVolume();
+	
 	int bytes_per_sample = (use_stereo ? 4 : 2);
 
 	std::stringstream cmd;
@@ -92,26 +100,37 @@ void AudioData::Play()
 	pthread_mutex_unlock(&audio_mutex);
 }
 
-void AudioData::SetVolume(int newvolume)
-{
-	AudioData::SetVolume(newvolume, CardNumber);
-}
-
-int AudioData::PlayWav(std::string filename, int cardnumber)
+int AudioData::PlayWav(std::string filename)
 {
 	char command[256] = "";
 	int status;
-	snprintf(command, 256, "aplay %s -D hw:%d", filename.c_str(), cardnumber);
+	snprintf(command, 256, "aplay %s -D hw:%d", filename.c_str(), CardNumber);
+	pthread_mutex_lock(&audio_mutex);
 	status = system(command);
+	pthread_mutex_unlock(&audio_mutex);
 	return status;
 }
 
-int AudioData::SetVolume(int newvolume, int cardnumber)
+void AudioData::SetVolume(int newvolume)
 {
+	this->newvolume = newvolume;
+}
+
+int AudioData::updateVolume()
+{
+	if ((volume == newvolume) || (newvolume == -1))
+	{
+		return 0;
+	}
+
+	volume = newvolume;
+
 	char command[256] = "";
 	int status = 0;
-	snprintf(command, 256, "amixer -c %d controls | grep MIXER | grep Playback | grep Volume | sed s/[^0-9]*//g", cardnumber);
+	snprintf(command, 256, "amixer -c %d controls | grep MIXER | grep Playback | grep Volume | sed s/[^0-9]*//g", CardNumber);
 	//std::cout << command << std::endl;
+
+	pthread_mutex_lock(&audio_mutex);
 	FILE *fp = popen(command, "r");
 	if (fp == nullptr)
 	{
@@ -129,20 +148,24 @@ int AudioData::SetVolume(int newvolume, int cardnumber)
 		else
 		{
 			int numid = atoi(res);
-			snprintf(command, sizeof(command), "amixer -c %d cset numid=%d %d%% -q", cardnumber, numid, newvolume);
+			snprintf(command, sizeof(command), "amixer -c %d cset numid=%d %d%% -q", CardNumber, numid, newvolume);
 			//std::cout << command << std::endl;
+
 			status = system(command);
 		}
 	}
 	pclose(fp);
+	pthread_mutex_unlock(&audio_mutex);
 	return status;
 }
 
-bool AudioData::Speak(std::string text, int cardnumber)
+bool AudioData::Speak(std::string text)
 {
+	updateVolume();
+
 	char command[1023] = "";
 	int status;
-	snprintf(command, 1023, "espeak --stdout \"%s\" | aplay -q -D plughw:%d", text.c_str(), cardnumber);
+	snprintf(command, 1023, "espeak --stdout \"%s\" | aplay -q -D plughw:%d", text.c_str(), CardNumber);
 	pthread_mutex_lock(&audio_mutex);
 	int res = system(command);
 	pthread_mutex_unlock(&audio_mutex);

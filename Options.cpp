@@ -9,6 +9,7 @@ RaspiVoiceOptions cmdLineOptions;
 static struct option long_getopt_options[] =
 {
 	{ "help", no_argument, 0, 'h' },
+	{ "daemon", no_argument, 0, 'd' },
 	{ "rows", required_argument, 0, 'r' },
 	{ "columns", required_argument, 0, 'c' },
 	{ "image_source", required_argument, 0, 's' },
@@ -41,7 +42,6 @@ static struct option long_getopt_options[] =
 	{ "sample_freq_Hz", required_argument, 0, 'Z' },
 	{ "threshold", required_argument, 0, 'T' },
 	{ "use_stereo", required_argument, 0, 'O' },
-	{ "daemon", no_argument, 0, 'd' },
 	{ "grab_keyboard", required_argument, 0, 'g' },
 	{ "speak", no_argument, 0, 'S' },
 	{ 0, 0, 0, 0 }
@@ -104,7 +104,7 @@ bool SetCommandLineOptions(int argc, char *argv[])
 	//Retrieve command line options:
 	int option_index = 0;
 	int cmdline_opt;
-	while ((cmdline_opt = getopt_long_only(argc, argv, "hr:c:s:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:dg:S", long_getopt_options, &option_index)) != -1)
+	while ((cmdline_opt = getopt_long_only(argc, argv, "hdr:c:s:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:g:S", long_getopt_options, &option_index)) != -1)
 	{
 		switch (cmdline_opt)
 		{
@@ -113,6 +113,9 @@ bool SetCommandLineOptions(int argc, char *argv[])
 			case 'h':
 				ShowHelp();
 				return false;
+			case 'd':
+				opt.daemon = true;
+				break;
 			case 'r':
 				opt.rows = atoi(optarg);
 				break;
@@ -208,9 +211,6 @@ bool SetCommandLineOptions(int argc, char *argv[])
 				break;
 			case 'O':
 				opt.use_stereo = (atoi(optarg) != 0);
-				break;
-			case 'd':
-				opt.daemon = true;
 				break;
 			case 'g':
 				opt.grab_keyboard = optarg;
