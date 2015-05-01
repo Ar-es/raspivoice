@@ -27,6 +27,7 @@
 #include "Options.h"
 #include "RaspiVoice.h"
 #include "KeyboardInput.h"
+#include "AudioData.h"
 
 void *run_worker_thread(void *arg);
 bool setup_screen(void);
@@ -63,11 +64,21 @@ int main(int argc, char *argv[])
 		daemon_startup();
 	}
 
+	if (cmdline_opt.grab_keyboard != "")
+	{
+		if (!keyboardInput.GrabKeyboard(cmdline_opt.grab_keyboard))
+		{
+			std::cerr << "Cannot grab keyboard device: " << cmdline_opt.grab_keyboard << "." << std::endl;
+			return -1;
+		}
+	}
+
 	//Start Program in worker thread:
 	rvopt = cmdline_opt;
 	//Warning: Do not read or write rvopt or quit_flag without locking after this.
 	pthread_t thr;
 	pthread_mutex_init(&rvopt_mutex, NULL);
+	AudioData::Init();
 	if (pthread_create(&thr, NULL, run_worker_thread, NULL))
 	{
 		std::cerr << "Error setting up thread." << std::endl;
@@ -99,23 +110,12 @@ int main(int argc, char *argv[])
 	}
 	else if (cmdline_opt.grab_keyboard != "")
 	{
-		if (!cmdline_opt.daemon)
-		{
-			std::cerr << "Grab keyboard device is only possible in daemon mode." << std::endl;
-		}
-		else
-		{
-			if (!keyboardInput.GrabKeyboard(cmdline_opt.grab_keyboard))
-			{
-				std::cerr << "Cannot grab keyboard device: " << cmdline_opt.grab_keyboard << "." << std::endl;
-			}
-			else
-			{
-				main_loop(keyboardInput, false); //without ncurses
+		main_loop(keyboardInput, false); //without ncurses
+	}
 
-				keyboardInput.ReleaseKeyboard();
-			}
-		}
+	if (cmdline_opt.grab_keyboard != "")
+	{
+		keyboardInput.ReleaseKeyboard();
 	}
 
 	//Wait for worker thread:
@@ -178,7 +178,7 @@ bool setup_screen()
 	noecho();
 	cbreak();
 	keypad(stdscr, TRUE);
-	timeout(20); //ms
+	timeout(10); //ms
 
 	return true;
 }

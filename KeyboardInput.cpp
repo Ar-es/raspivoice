@@ -50,6 +50,11 @@ void KeyboardInput::ReleaseKeyboard()
 
 int KeyboardInput::ReadKey()
 {
+	if (fevdev == -1)
+	{
+		return ERR;
+	}
+	
 	struct input_event ev[64];
 
 	int rd;

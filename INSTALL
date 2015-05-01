@@ -7,7 +7,7 @@ And Raspberry Pi 2 Model B, running Raspbian, Linux raspberrypi 3.18.7-v7+ #755 
 
 2. install necessary packages:
 
-sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8 libncurses5-dev espeak
+sudo apt-get install gcc cmake libopencv-dev binutils wget gcc-4.8 g++-4.8 libncurses5-dev espeak libasound2-dev libespeak-dev
 
 3. install raspicam: (follow http://www.uco.es/investiga/grupos/ava/node/40 in case of errors):
 
