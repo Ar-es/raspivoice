@@ -43,6 +43,7 @@ typedef struct
 	bool daemon;
 	std::string grab_keyboard;
 	bool speak;
+	bool quit;
 } RaspiVoiceOptions;
 
 RaspiVoiceOptions GetDefaultOptions(void);

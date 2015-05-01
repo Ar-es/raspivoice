@@ -15,6 +15,8 @@
 
 #include "AudioData.h"
 
+pthread_mutex_t AudioData::audio_mutex;
+
 AudioData::AudioData(int sample_freq_Hz, int sample_count, bool use_stereo) :
 	sample_freq_Hz(sample_freq_Hz),
 	sample_count(sample_count),
@@ -23,6 +25,7 @@ AudioData::AudioData(int sample_freq_Hz, int sample_count, bool use_stereo) :
 	CardNumber(0),
 	samplebuffer(std::vector<uint16_t>((use_stereo ? 2 : 1) * sample_count))
 {
+	pthread_mutex_init(&audio_mutex, NULL);
 }
 
 void AudioData::wi(FILE* fp, uint16_t i)
@@ -82,9 +85,11 @@ void AudioData::Play()
 		std::cout << cmd.str() << std::endl;
 	}
 
+	pthread_mutex_lock(&audio_mutex);
 	FILE* p = popen(cmd.str().c_str(), "w");
 	fwrite(samplebuffer.data(), bytes_per_sample, sample_count, p);
 	pclose(p);
+	pthread_mutex_unlock(&audio_mutex);
 }
 
 void AudioData::SetVolume(int newvolume)
@@ -135,9 +140,11 @@ int AudioData::SetVolume(int newvolume, int cardnumber)
 
 bool AudioData::Speak(std::string text, int cardnumber)
 {
-	char command[256] = "";
+	char command[1023] = "";
 	int status;
-	snprintf(command, 256, "espeak --stdout \"%s\" | aplay -q -D hw:", text.c_str(), cardnumber);
+	snprintf(command, 1023, "espeak --stdout \"%s\" | aplay -fS16_LE -I -c2 -D hw:%d --file-type raw /dev/null", text.c_str(), cardnumber);
+	pthread_mutex_lock(&audio_mutex);
 	int res = system(command);
+	pthread_mutex_unlock(&audio_mutex);
 	return (res == 0);
 }

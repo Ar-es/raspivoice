@@ -35,8 +35,6 @@ void main_loop(KeyboardInput &keyboardInput, bool use_ncurses);
 RaspiVoiceOptions rvopt;
 pthread_mutex_t rvopt_mutex;
 
-bool quit_flag = false;
-pthread_mutex_t quit_flag_mutex;
 std::exception_ptr exc_ptr;
 
 int main(int argc, char *argv[])
@@ -61,7 +59,6 @@ int main(int argc, char *argv[])
 	rvopt = cmdline_opt;
 	//Warning: Do not read or write rvopt or quit_flag without locking after this.
 	pthread_t thr;
-	pthread_mutex_init(&quit_flag_mutex, NULL);
 	pthread_mutex_init(&rvopt_mutex, NULL);
 	if (pthread_create(&thr, NULL, run_worker_thread, NULL))
 	{
@@ -88,9 +85,9 @@ int main(int argc, char *argv[])
 		std::cout << "Press Enter to quit." << std::endl << std::endl;
 		getchar();
 
-		pthread_mutex_lock(&quit_flag_mutex);
-		quit_flag = true;
-		pthread_mutex_unlock(&quit_flag_mutex);
+		pthread_mutex_lock(&rvopt_mutex);
+		rvopt.quit = true;
+		pthread_mutex_unlock(&rvopt_mutex);
 	}
 	else if (cmdline_opt.grab_keyboard != "")
 	{
@@ -144,8 +141,10 @@ void setup_screen()
 
 void main_loop(KeyboardInput &keyboardInput, bool use_ncurses)
 {
-	bool quit = false;
-	while (!quit)
+	RaspiVoiceOptions rvopt_local;
+	rvopt_local.quit = false;
+
+	while (!rvopt_local.quit)
 	{
 		int ch;
 
@@ -161,28 +160,22 @@ void main_loop(KeyboardInput &keyboardInput, bool use_ncurses)
 		if (ch != ERR)
 		{
 			//Local copy of options:
-			RaspiVoiceOptions rvopt_local;
 			pthread_mutex_lock(&rvopt_mutex);
 			rvopt_local = rvopt;
 			pthread_mutex_unlock(&rvopt_mutex);
 
-			quit = keyboardInput.KeyPressedAction(rvopt_local, ch);
+			keyboardInput.KeyPressedAction(rvopt_local, ch);
 
 			//Set new options:
 			pthread_mutex_lock(&rvopt_mutex);
+			if (rvopt.quit)
+			{
+				rvopt_local.quit = true;
+			}
 			rvopt = rvopt_local;
 			pthread_mutex_unlock(&rvopt_mutex);
 		}
-
-		pthread_mutex_lock(&quit_flag_mutex);
-		if (quit_flag || quit)
-		{
-			quit = true;
-			quit_flag = true;
-		}
-		pthread_mutex_unlock(&quit_flag_mutex);
 	}
-
 }
 
 void *run_worker_thread(void *arg)
@@ -198,8 +191,7 @@ void *run_worker_thread(void *arg)
 		//Init:
 		RaspiVoice raspiVoice(rvopt_local);
 
-		bool quit = false;
-		while (!quit)
+		while (!rvopt_local.quit)
 		{
 			//Copy any new options:
 			pthread_mutex_lock(&rvopt_mutex);
@@ -208,14 +200,6 @@ void *run_worker_thread(void *arg)
 
 			//Read and play one frame:
 			raspiVoice.PlayFrame(rvopt_local);
-
-			//Check for quit flag:
-			pthread_mutex_lock(&quit_flag_mutex);
-			if (quit_flag)
-			{
-				quit = true;
-			}
-			pthread_mutex_unlock(&quit_flag_mutex);
 		}
 	}
 	catch (std::runtime_error err)
@@ -225,11 +209,10 @@ void *run_worker_thread(void *arg)
 		{
 			std::cout << err.what() << std::endl;
 		}
-		pthread_mutex_lock(&quit_flag_mutex);
-		quit_flag = true;
-		pthread_mutex_unlock(&quit_flag_mutex);
+		pthread_mutex_lock(&rvopt_mutex);
+		rvopt.quit = true;
+		pthread_mutex_unlock(&rvopt_mutex);
 	}
-	
 
 	pthread_exit(nullptr);
 }

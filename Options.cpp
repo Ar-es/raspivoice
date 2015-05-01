@@ -90,6 +90,7 @@ RaspiVoiceOptions GetDefaultOptions()
 	opt.grab_keyboard = "";
 	opt.speak = false;
 
+	opt.quit = false;
 	return opt;
 }
 

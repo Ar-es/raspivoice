@@ -12,6 +12,7 @@ private:
 	const int sample_freq_Hz;
 	const int sample_count;
 	std::vector<uint16_t> samplebuffer;
+	static pthread_mutex_t audio_mutex;
 
 	void wi(FILE* fp, uint16_t i);
 	void wl(FILE* fp, uint32_t l);
