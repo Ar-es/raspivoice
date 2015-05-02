@@ -33,7 +33,7 @@ void *run_worker_thread(void *arg);
 bool setup_screen(void);
 void close_screen(void);
 void daemon_startup(void);
-void main_loop(KeyboardInput &keyboardInput, bool use_ncurses);
+void main_loop(KeyboardInput &keyboardInput);
 
 RaspiVoiceOptions rvopt;
 pthread_mutex_t rvopt_mutex;
@@ -49,7 +49,6 @@ std::exception_ptr exc_ptr;
 int main(int argc, char *argv[])
 {
 	RaspiVoiceOptions cmdline_opt;
-	KeyboardInput keyboardInput;
 
 	if (!SetCommandLineOptions(argc, argv))
 	{
@@ -64,14 +63,32 @@ int main(int argc, char *argv[])
 		daemon_startup();
 	}
 
-	if (cmdline_opt.grab_keyboard != "")
+	KeyboardInput keyboardInput;
+
+	//Setup keyboard:
+	bool use_ncurses = true;
+	if (cmdline_opt.verbose || cmdline_opt.daemon)
 	{
-		if (!keyboardInput.GrabKeyboard(cmdline_opt.grab_keyboard))
+		use_ncurses = false;
+	}
+
+	if (cmdline_opt.use_rotary_encoder)
+	{
+		keyboardInput.SetInputType(KeyboardInput::InputType::RotaryEncoder);
+	}
+	else if (cmdline_opt.grab_keyboard != "")
+	{
+		if (!keyboardInput.SetInputType(KeyboardInput::InputType::Keyboard, cmdline_opt.grab_keyboard))
 		{
 			std::cerr << "Cannot grab keyboard device: " << cmdline_opt.grab_keyboard << "." << std::endl;
 			return -1;
 		}
 	}
+	else if (use_ncurses)
+	{
+		keyboardInput.SetInputType(KeyboardInput::InputType::Terminal);
+	}
+	
 
 	//Start Program in worker thread:
 	rvopt = cmdline_opt;
@@ -85,14 +102,15 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	if ((!cmdline_opt.verbose) && (!cmdline_opt.daemon))
+	//Setup UI:
+	if (use_ncurses)
 	{
 		//Show interactive screen:
 		if (setup_screen())
 		{
 			keyboardInput.PrintInteractiveCommands();
 
-			main_loop(keyboardInput, true); //with ncurses
+			main_loop(keyboardInput);
 
 			close_screen();
 		}
@@ -108,9 +126,9 @@ int main(int argc, char *argv[])
 		rvopt.quit = true;
 		pthread_mutex_unlock(&rvopt_mutex);
 	}
-	else if (cmdline_opt.grab_keyboard != "")
+	else
 	{
-		main_loop(keyboardInput, false); //without ncurses
+		main_loop(keyboardInput);
 	}
 
 	if (cmdline_opt.grab_keyboard != "")
@@ -216,23 +234,14 @@ void close_screen()
 
 }
 
-void main_loop(KeyboardInput &keyboardInput, bool use_ncurses)
+void main_loop(KeyboardInput &keyboardInput)
 {
 	RaspiVoiceOptions rvopt_local;
 	rvopt_local.quit = false;
 
 	while (!rvopt_local.quit)
 	{
-		int ch;
-
-		if (use_ncurses)
-		{
-			ch = getch();
-		}
-		else
-		{
-			ch = keyboardInput.ReadKey();
-		}
+		int ch = keyboardInput.ReadKey();
 
 		if (ch != ERR)
 		{
@@ -304,7 +313,7 @@ void *run_worker_thread(void *arg)
 
 void daemon_startup(void)
 {
-	pid_t pid, sid;
+	pid_t pid;
 
 	pid = fork();
 	if (pid < 0)
@@ -315,10 +324,10 @@ void daemon_startup(void)
 	{
 		exit(EXIT_SUCCESS);
 	}
-
+	
 	umask(0);
 
-	sid = setsid();
+	pid_t sid = setsid();
 	if (sid < 0)
 	{
 		exit(EXIT_FAILURE);

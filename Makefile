@@ -23,7 +23,7 @@ error:
 	$(error Invalid configuration, please check your inputs)
 endif
 
-SOURCEFILES := AudioData.cpp ImageToSoundscape.cpp KeyboardInput.cpp Options.cpp printtime.cpp RaspiVoice.cpp RaspiVoiceMain.cpp
+SOURCEFILES := AudioData.cpp ImageToSoundscape.cpp KeyboardInput.cpp Options.cpp printtime.cpp rotaryencoder.cpp RaspiVoice.cpp RaspiVoiceMain.cpp
 EXTERNAL_LIBS := 
 EXTERNAL_LIBS_COPIED := $(foreach lib, $(EXTERNAL_LIBS),$(BINARYDIR)/$(notdir $(lib)))
 

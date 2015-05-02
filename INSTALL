@@ -22,7 +22,13 @@ make -j 4
 sudo make install
 sudo ldconfig
 
-4. Go to raspivoice source folder (where this INSTALL file is located) and build raspivoice:
+4. Install wiringPI:
+cd ~
+git clone git://git.drogon.net/wiringPi
+cd wiringPi
+./build
+
+5. Go to raspivoice source folder (where this INSTALL file is located) and build raspivoice:
 cd ~/raspivoice/
 
 # -either-: on Raspberry pi 1:
@@ -30,10 +36,10 @@ make -j 4
 # -or-: on Raspberry Pi 2:
 make -j 4 CONFIG=release_rpi2
 
-5. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel by pressing Enter.):
+6. If all went well, you can now test raspivoice in the Release folder (should output some text and keep running, cancel by pressing Enter.):
 ./Release/raspivoice -s0 -v
 
-6. install to system:
+7. install to system:
 sudo cp Release/raspivoice /usr/local/bin/
 
 ---------------------------------------------------------------------------------------

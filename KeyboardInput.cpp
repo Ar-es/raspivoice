@@ -7,18 +7,86 @@
 #include <cmath>
 #include <vector>
 #include <stdexcept>
+#include <iostream>
+#include <wiringPi.h>
 
 #include "Options.h"
 #include "KeyboardInput.h"
 #include "AudioData.h"
 
+enum class MovementKeys: int
+{
+	PreviousOption = 'w',
+	NextOption = 's',
+	PreviousValue = 'a',
+	NextValue = 'd',
+};
+
 KeyboardInput::KeyboardInput() :
+	inputType(InputType::NoInput),
 	fevdev(-1),
-	currentOptionIndex(0)
+	currentOptionIndex(0),
+	lastEncoderValue(0),
+	encoder(nullptr)
 {
 }
 
-bool KeyboardInput::GrabKeyboard(std::string bus_device_id)
+
+void KeyboardInput::setupRotaryEncoder()
+{
+	wiringPiSetup();
+	encoder = setupencoder(4, 5);
+}
+
+int KeyboardInput::readRotaryEncoder()
+{
+	int ch = ERR;
+	if (encoder != nullptr)
+	{
+		updateEncoders();
+		usleep(100000);
+		long l = encoder->value;
+		if (l != lastEncoderValue)
+		{
+			//printf("lastEncoderValue: %ld\n", l);
+			if (l > lastEncoderValue)
+			{
+				ch = (int)MovementKeys::NextOption;
+			}
+			else if (l < lastEncoderValue)
+			{
+				ch = (int)MovementKeys::PreviousOption;
+			}
+
+			lastEncoderValue = l;
+		}
+
+		//TODO: Read GPIO button press and set ch = (int)MovementKeys::PreviousValue and (int)MovementKeys::NextValue;
+	}
+
+	return ch;
+}
+
+bool KeyboardInput::SetInputType(InputType inputType, std::string keyboard)
+{
+	this->inputType = inputType;
+
+	if (inputType == InputType::Keyboard)
+	{
+		if (!grabKeyboard(keyboard))
+		{
+			return false;
+		}
+	}
+	else if (inputType == InputType::RotaryEncoder)
+	{
+		setupRotaryEncoder();
+	}
+
+	return true;
+}
+
+bool KeyboardInput::grabKeyboard(std::string bus_device_id)
 {
 	int device_id = atoi(bus_device_id.c_str());
 
@@ -50,93 +118,55 @@ void KeyboardInput::ReleaseKeyboard()
 
 int KeyboardInput::ReadKey()
 {
-	if (fevdev == -1)
+	if (inputType == InputType::Terminal)
 	{
-		return ERR;
+		return getch();
 	}
-	
-	struct input_event ev[64];
-
-	int rd;
-	if ((rd = read(fevdev, ev, sizeof(struct input_event) * 64)) < sizeof(struct input_event))
+	else if (inputType == InputType::Keyboard)
 	{
-		return ERR;
+		if (fevdev == -1)
+		{
+			return ERR;
+		}
+		struct input_event ev[64];
+
+		int rd;
+		if ((rd = read(fevdev, ev, sizeof(struct input_event) * 64)) < sizeof(struct input_event))
+		{
+			return ERR;
+		}
+
+		int value = ev[0].value;
+		if (value != ' ' && ev[1].value == 1 && ev[1].type == EV_KEY) //value=1: key press, value=0 key release
+		{
+			return(keyEventMap(ev[1].code));
+		}
 	}
-
-	int value = ev[0].value;
-	if (value != ' ' && ev[1].value == 1 && ev[1].type == EV_KEY) //value=1: key press, value=0 key release
+	else if (inputType == InputType::RotaryEncoder)
 	{
-		return(keyEventMap(ev[1].code));
+		return readRotaryEncoder();
 	}
 
 	return ERR;
 }
 
-
-int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
+void KeyboardInput::PrintInteractiveCommands()
 {
-	int new_index = 0;
+	printw("raspivoice\n");
+	printw("Press key to cycle settings:\n");
+	printw("0: Mute [off, on]\n");
+	printw("1: Negative image [off, on]\n");
+	printw("2: Zoom [off, x2, x4]\n");
+	printw("3: Blinders [off, on]\n");
+	printw("4: Edge detection [off, 50%%, 100%%]\n");
+	printw("5: Threshold [off, 25%%, 50%%, 75%%]\n");
+	printw("6: Brightness [low, normal, high]\n");
+	printw("7: Contrast [x1, x2, x3]\n");
+	printw("8: Foveal mapping [off, on]\n");
+	printw(".: Restore defaults\n");
+	printw("q, [Escape]: Quit\n");
 
-	if (changevalue == -1)
-	{
-		new_index = i - 1;
-		if (new_index < 0)
-		{
-			new_index = 0;
-		}
-	}
-	else if (changevalue == 1)
-	{
-		new_index = i + 1;
-		if (new_index > maxindex)
-		{
-			new_index = maxindex;
-		}
-	}
-	else if (changevalue == 2)
-	{
-		new_index = i + 1;
-		if (new_index > maxindex)
-		{
-			new_index = 0;
-		}
-	}
-	else if (changevalue == -2)
-	{
-		new_index = i - 1;
-		if (new_index < 0)
-		{
-			new_index = maxindex;
-		}
-	}
-
-	return new_index;
-}
-
-void KeyboardInput::cycleValues(float &current_value, std::vector<float> value_list, int changevalue)
-{
-	for (int i = 0; i < value_list.size(); i++)
-	{
-		if (fabs(current_value - value_list[i]) < 1e-10)
-		{
-			current_value = value_list[changeIndex(i, value_list.size() - 1, changevalue)];
-			return;
-		}
-	}
-	current_value = value_list[0];
-}
-
-void KeyboardInput::cycleValues(int &current_value, std::vector<int> value_list, int changevalue)
-{
-	for (int i = 0; i < value_list.size(); i++)
-	{
-		if (current_value == value_list[i])
-		{
-			current_value = value_list[changeIndex(i, value_list.size() - 1, changevalue)];
-			return;
-		}
-	}
-	current_value = value_list[0];
+	refresh();
 }
 
 void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
@@ -149,22 +179,22 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 	AudioData audioData(opt.audio_card);
 
 	//Menu navigation keys:
-	switch (ch)
+	switch ((MovementKeys)ch)
 	{
-		case 'a': //previous value
+		case MovementKeys::PreviousValue:
 			changevalue = -1;
 			break;
-		case 's': //next option
+		case MovementKeys::NextOption:
 			option_changed = true;
 			if (currentOptionIndex > 0)
 			{
 				currentOptionIndex--;
 			}
 			break;
-		case 'd': //next value
+		case MovementKeys::NextValue:
 			changevalue = 1;
 			break;
-		case 'w': //previous option
+		case MovementKeys::PreviousOption:
 			option_changed = true;
 			if (currentOptionIndex < (sizeof(option_cycle)-1))
 			{
@@ -308,7 +338,7 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 	{
 		if (!audioData.Speak(state_str.str()))
 		{
-			throw(std::runtime_error("Error calling Speak(). Use verbose mode for more info."));
+			std::cerr << "Error calling Speak(). Use verbose mode for more info." << std::endl;
 		}
 	}
 
@@ -427,20 +457,68 @@ int KeyboardInput::keyEventMap(int event_code)
 }
 
 
-void KeyboardInput::PrintInteractiveCommands()
+int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 {
-	printw("raspivoice\n");
-	printw("Press key to cycle settings:\n");
-	printw("0: Mute [off, on]\n");
-	printw("1: Negative image [off, on]\n");
-	printw("2: Zoom [off, x2, x4]\n");
-	printw("3: Blinders [off, on]\n");
-	printw("4: Edge detection [off, 50%%, 100%%]\n");
-	printw("5: Threshold [off, 25%%, 50%%, 75%%]\n");
-	printw("6: Brightness [low, normal, high]\n");
-	printw("7: Contrast [x1, x2, x3]\n");
-	printw("8: Foveal mapping [off, on]\n");
-	printw(".: Restore defaults\n");
-	printw("q, [Escape]: Quit\n");
+	int new_index = 0;
+
+	if (changevalue == -1)
+	{
+		new_index = i - 1;
+		if (new_index < 0)
+		{
+			new_index = 0;
+		}
+	}
+	else if (changevalue == 1)
+	{
+		new_index = i + 1;
+		if (new_index > maxindex)
+		{
+			new_index = maxindex;
+		}
+	}
+	else if (changevalue == 2)
+	{
+		new_index = i + 1;
+		if (new_index > maxindex)
+		{
+			new_index = 0;
+		}
+	}
+	else if (changevalue == -2)
+	{
+		new_index = i - 1;
+		if (new_index < 0)
+		{
+			new_index = maxindex;
+		}
+	}
+
+	return new_index;
 }
 
+void KeyboardInput::cycleValues(float &current_value, std::vector<float> value_list, int changevalue)
+{
+	for (int i = 0; i < value_list.size(); i++)
+	{
+		if (fabs(current_value - value_list[i]) < 1e-10)
+		{
+			current_value = value_list[changeIndex(i, value_list.size() - 1, changevalue)];
+			return;
+		}
+	}
+	current_value = value_list[0];
+}
+
+void KeyboardInput::cycleValues(int &current_value, std::vector<int> value_list, int changevalue)
+{
+	for (int i = 0; i < value_list.size(); i++)
+	{
+		if (current_value == value_list[i])
+		{
+			current_value = value_list[changeIndex(i, value_list.size() - 1, changevalue)];
+			return;
+		}
+	}
+	current_value = value_list[0];
+}

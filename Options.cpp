@@ -43,6 +43,7 @@ static struct option long_getopt_options[] =
 	{ "threshold", required_argument, 0, 'T' },
 	{ "use_stereo", required_argument, 0, 'O' },
 	{ "grab_keyboard", required_argument, 0, 'g' },
+	{ "use_rotary_encoder", no_argument, 0, 'A' },
 	{ "speak", no_argument, 0, 'S' },
 	{ 0, 0, 0, 0 }
 }; 
@@ -88,6 +89,7 @@ RaspiVoiceOptions GetDefaultOptions()
 	opt.mute = false;
 	opt.daemon = false;
 	opt.grab_keyboard = "";
+	opt.use_rotary_encoder = false;
 	opt.speak = false;
 
 	opt.quit = false;
@@ -104,7 +106,7 @@ bool SetCommandLineOptions(int argc, char *argv[])
 	//Retrieve command line options:
 	int option_index = 0;
 	int cmdline_opt;
-	while ((cmdline_opt = getopt_long_only(argc, argv, "hdr:c:s:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:g:S", long_getopt_options, &option_index)) != -1)
+	while ((cmdline_opt = getopt_long_only(argc, argv, "hdr:c:s:i:o:a:V:pI:vnf:R:e:B:C:b:z:mE:G:L:H:t:x:y:d:F:D:N:Z:T:O:g:AS", long_getopt_options, &option_index)) != -1)
 	{
 		switch (cmdline_opt)
 		{
@@ -215,6 +217,9 @@ bool SetCommandLineOptions(int argc, char *argv[])
 			case 'g':
 				opt.grab_keyboard = optarg;
 				break;
+			case 'A':
+				opt.use_rotary_encoder = true;
+				break;
 			case 'S':
 				opt.speak = true;
 				break;
@@ -260,6 +265,7 @@ void ShowHelp()
 	std::cout << "-V, --volume=[-1]\t\t\tAudio volume (set by system mixer, 0-100, -1 for no change)" << std::endl;
 	std::cout << "-S, --speak\t\t\t\tSpeak out option changes (espeak)." << std::endl;
 	std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number 0, 1, 2... from /dev/input/event*" << std::endl;
+	std::cout << "-A  --use_rotary_encoder\t\tUse rotary encoder on GPIO" << std::endl;
 	std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
 	std::cout << "-v, --verbose\t\t\t\tVerbose outputs." << std::endl;
 	std::cout << "-n, --negative_image\t\t\tSwap bright and dark." << std::endl;
