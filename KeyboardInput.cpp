@@ -13,12 +13,13 @@
 #include "Options.h"
 #include "KeyboardInput.h"
 
-enum class MovementKeys: int
+enum class MenuKeys: int
 {
 	PreviousOption = 'w',
 	NextOption = 's',
 	PreviousValue = 'a',
 	NextValue = 'd',
+	CycleValue = 'c'
 };
 
 KeyboardInput::KeyboardInput() :
@@ -55,17 +56,17 @@ int KeyboardInput::readRotaryEncoder()
 			
 			if (l > lastEncoderValue)
 			{
-				ch = (int)MovementKeys::NextOption;
+				ch = (int)MenuKeys::NextOption;
 			}
 			else if (l < lastEncoderValue)
 			{
-				ch = (int)MovementKeys::PreviousOption;
+				ch = (int)MenuKeys::PreviousOption;
 			}
 
 			lastEncoderValue = l;
 		}
 
-		//TODO: Read GPIO button press and set ch = (int)MovementKeys::PreviousValue and (int)MovementKeys::NextValue;
+		//TODO: Read GPIO button press and set ch = (int)MenuKeys::PreviousValue and (int)MenuKeys::NextValue;
 	}
 
 	return ch;
@@ -198,10 +199,10 @@ std::string KeyboardInput::GetInteractiveCommandList()
 
 std::string KeyboardInput::KeyPressedAction(int ch)
 {
-	std::vector<int> option_cycle { '0', '1', '2', '3', '4', '5', '6', '7', '8', '+', '-', '.', 'q' };
+	std::vector<int> option_cycle{ '0', '1', '2', '3', '4', '5', '6', '7', '8', '.' }; //, '+', '-', 'q' };
 
 	bool option_changed = false;
-	int changevalue = 2; //-1: decrease value, 0: no change, 1: increase value, 2: cycle values
+	int changevalue = 0; //-1: decrease value, 0: no change, 1: increase value, 2: cycle values
 	std::stringstream state_str;
 	int newvolume = -1;
 
@@ -211,12 +212,12 @@ std::string KeyboardInput::KeyPressedAction(int ch)
 	}
 
 	//Menu navigation keys:
-	switch ((MovementKeys)ch)
+	switch ((MenuKeys)ch)
 	{
-		case MovementKeys::PreviousValue:
+		case MenuKeys::PreviousValue:
 			changevalue = -1;
 			break;
-		case MovementKeys::PreviousOption:
+		case MenuKeys::PreviousOption:
 			option_changed = true;
 			if (currentOptionIndex > 0)
 			{
@@ -227,10 +228,10 @@ std::string KeyboardInput::KeyPressedAction(int ch)
 				currentOptionIndex = option_cycle.size() - 1;
 			}
 			break;
-		case MovementKeys::NextValue:
+		case MenuKeys::NextValue:
 			changevalue = 1;
 			break;
-		case MovementKeys::NextOption:
+		case MenuKeys::NextOption:
 			option_changed = true;
 			if (currentOptionIndex < (option_cycle.size()-1))
 			{
@@ -240,6 +241,9 @@ std::string KeyboardInput::KeyPressedAction(int ch)
 			{
 				currentOptionIndex = 0;
 			}
+			break;
+		case MenuKeys::CycleValue:
+			changevalue = 2;
 			break;
 	}
 
@@ -294,10 +298,14 @@ std::string KeyboardInput::KeyPressedAction(int ch)
 	}
 	else //value change requested
 	{
-		if ((changevalue == -1) || (changevalue == 1))
+		if (changevalue != 0)
 		{
 			//use current option if navigation keys were used:
 			ch = option_cycle[currentOptionIndex];
+		}
+		else
+		{
+			changevalue = 2; //cycle value if direct key was used
 		}
 
 		//change value and speak out new value:
@@ -396,15 +404,14 @@ int KeyboardInput::keyEventMap(int event_code)
 		case KEY_BACK:
 		case KEY_STOP:
 		case KEY_F1:
-		case BTN_LEFT:
-			ch = (int)MovementKeys::PreviousValue;
+			ch = (int)MenuKeys::PreviousValue;
 			break;
 		case KEY_S:
 		case KEY_DOWN:
-		case KEY_PREVIOUSSONG:
-		case KEY_REWIND:
+		case KEY_FORWARD:
+		case KEY_NEXTSONG:
 		case KEY_F3:
-			ch = (int)MovementKeys::NextOption;
+			ch = (int)MenuKeys::NextOption;
 			break;
 		case KEY_D:
 		case KEY_RIGHT:
@@ -412,14 +419,20 @@ int KeyboardInput::keyEventMap(int event_code)
 		case KEY_PLAY:
 		case KEY_PAUSE:
 		case BTN_RIGHT:
-			ch = (int)MovementKeys::NextValue;
+			ch = (int)MenuKeys::NextValue;
 			break;
 		case KEY_W:
 		case KEY_UP:
-		case KEY_FORWARD:
-		case KEY_NEXTSONG:
+		case KEY_PREVIOUSSONG:
+		case KEY_REWIND:
 		case KEY_HOME:
-			ch = (int)MovementKeys::PreviousOption;
+			ch = (int)MenuKeys::PreviousOption;
+			break;
+		case KEY_LINEFEED:
+		case KEY_KPENTER:
+		case KEY_SPACE:
+		case BTN_LEFT:
+			ch = (int)MenuKeys::CycleValue;
 			break;
 		case KEY_0:
 		case KEY_KP0:
@@ -470,10 +483,6 @@ int KeyboardInput::keyEventMap(int event_code)
 		case KEY_SLASH:
 		case KEY_KPSLASH:
 			ch = '/';
-			break;
-		case KEY_LINEFEED:
-		case KEY_KPENTER:
-			ch = 13;
 			break;
 		case KEY_EQUAL:
 		case KEY_KPEQUAL:
