@@ -17,7 +17,7 @@ public:
 	};
 
 private:
-	int fevdev;
+	std::vector<int> fevdev;
 	int currentOptionIndex;
 	struct encoder *encoder;
 	InputType inputType;
@@ -35,7 +35,7 @@ public:
 
 	KeyboardInput();
 	bool SetInputType(InputType, std::string keyboard = "");
-	void KeyPressedAction(RaspiVoiceOptions &opt, int ch);
+	std::string KeyPressedAction(int ch);
 	void ReleaseKeyboard();
 	int ReadKey();
 	std::string GetInteractiveCommandList();

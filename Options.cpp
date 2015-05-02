@@ -6,6 +6,9 @@
 
 RaspiVoiceOptions cmdLineOptions;
 
+RaspiVoiceOptions rvopt;
+pthread_mutex_t rvopt_mutex;
+
 static struct option long_getopt_options[] =
 {
 	{ "help", no_argument, 0, 'h' },
@@ -264,7 +267,7 @@ void ShowHelp()
 	std::cout << "-a, --audio_card=[0]\t\t\tAudio card number (0,1,...), use aplay -l to get list" << std::endl;
 	std::cout << "-V, --volume=[-1]\t\t\tAudio volume (set by system mixer, 0-100, -1 for no change)" << std::endl;
 	std::cout << "-S, --speak\t\t\t\tSpeak out option changes (espeak)." << std::endl;
-	std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number 0, 1, 2... from /dev/input/event*" << std::endl;
+	std::cout << "-g  --grab_keyboard=[]\t\t\tGrab keyboard device for exclusive access. Use device number(s) 0,1,2... (comma separated without spaces) from /dev/input/event*" << std::endl;
 	std::cout << "-A  --use_rotary_encoder\t\tUse rotary encoder on GPIO" << std::endl;
 	std::cout << "-p, --preview\t\t\t\tOpen preview window(s). X server required." << std::endl;
 	std::cout << "-v, --verbose\t\t\t\tVerbose outputs." << std::endl;

@@ -48,6 +48,9 @@ typedef struct
 	bool quit;
 } RaspiVoiceOptions;
 
+extern RaspiVoiceOptions rvopt;
+extern pthread_mutex_t rvopt_mutex;
+
 RaspiVoiceOptions GetDefaultOptions(void);
 bool SetCommandLineOptions(int argc, char *argv[]);
 RaspiVoiceOptions GetCommandLineOptions();

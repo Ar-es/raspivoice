@@ -35,8 +35,7 @@ void close_screen(void);
 void daemon_startup(void);
 void main_loop(KeyboardInput &keyboardInput);
 
-RaspiVoiceOptions rvopt;
-pthread_mutex_t rvopt_mutex;
+RaspiVoiceOptions cmdline_opt;
 
 int newfd = -1;
 FILE *fd = NULL;
@@ -48,8 +47,6 @@ std::exception_ptr exc_ptr;
 
 int main(int argc, char *argv[])
 {
-	RaspiVoiceOptions cmdline_opt;
-
 	if (!SetCommandLineOptions(argc, argv))
 	{
 		return -1;
@@ -63,6 +60,8 @@ int main(int argc, char *argv[])
 		daemon_startup();
 	}
 
+	pthread_mutex_init(&rvopt_mutex, NULL);
+	rvopt = cmdline_opt;
 
 	//Setup keyboard:
 	KeyboardInput keyboardInput;
@@ -97,10 +96,8 @@ int main(int argc, char *argv[])
 
 
 	//Start Program in worker thread:
-	rvopt = cmdline_opt;
 	//Warning: Do not read or write rvopt or quit_flag without locking after this.
 	pthread_t thr;
-	pthread_mutex_init(&rvopt_mutex, NULL);
 	AudioData::Init();
 	if (pthread_create(&thr, NULL, run_worker_thread, NULL))
 	{
@@ -238,30 +235,45 @@ void close_screen()
 
 void main_loop(KeyboardInput &keyboardInput)
 {
-	RaspiVoiceOptions rvopt_local;
-	rvopt_local.quit = false;
+	bool quit = false;
+	AudioData audioData(cmdline_opt.audio_card);
 
-	while (!rvopt_local.quit)
+	while (!quit)
 	{
 		int ch = keyboardInput.ReadKey();
 
 		if (ch != ERR)
 		{
-			//Local copy of options:
-			pthread_mutex_lock(&rvopt_mutex);
-			rvopt_local = rvopt;
-			pthread_mutex_unlock(&rvopt_mutex);
+			std::cout << "ch: " << ch << std::endl;
+			
+			std::string state_str;
+			state_str = keyboardInput.KeyPressedAction(ch);
 
-			keyboardInput.KeyPressedAction(rvopt_local, ch);
-
-			//Set new options:
 			pthread_mutex_lock(&rvopt_mutex);
-			if (rvopt.quit)
+
+			if (quit || rvopt.quit)
 			{
-				rvopt_local.quit = true;
+				quit = true;
+				rvopt.quit = true;
 			}
-			rvopt = rvopt_local;
+
+			//Volume change?
+			if (rvopt.volume != -1)
+			{
+				audioData.SetVolume(rvopt.volume);
+			}
+
 			pthread_mutex_unlock(&rvopt_mutex);
+
+			//Speak state_str?
+			if ((cmdline_opt.speak) && (state_str != ""))
+			{
+				if (!audioData.Speak(state_str))
+				{
+					std::cerr << "Error calling Speak(). Use verbose mode for more info." << std::endl;
+				}
+			}
+
 		}
 	}
 }
@@ -291,11 +303,6 @@ void *run_worker_thread(void *arg)
 
 			//Play frame:
 			raspiVoice.PlayFrame(rvopt_local);
-
-			//Copy any new options:
-			pthread_mutex_lock(&rvopt_mutex);
-			rvopt_local = rvopt;
-			pthread_mutex_unlock(&rvopt_mutex);
 		}
 	}
 	catch (std::runtime_error err)

@@ -12,7 +12,6 @@
 
 #include "Options.h"
 #include "KeyboardInput.h"
-#include "AudioData.h"
 
 enum class MovementKeys: int
 {
@@ -24,7 +23,7 @@ enum class MovementKeys: int
 
 KeyboardInput::KeyboardInput() :
 	inputType(InputType::NoInput),
-	fevdev(-1),
+	fevdev(0),
 	currentOptionIndex(0),
 	lastEncoderValue(0),
 	encoder(nullptr),
@@ -91,32 +90,44 @@ bool KeyboardInput::SetInputType(InputType inputType, std::string keyboard)
 	return true;
 }
 
-bool KeyboardInput::grabKeyboard(std::string bus_device_id)
+bool KeyboardInput::grabKeyboard(std::string event_device_ids)
 {
-	int device_id = atoi(bus_device_id.c_str());
+	std::istringstream iss(event_device_ids);
 
-	std::string devpath("/dev/input/event" + bus_device_id);
-
-	fevdev = open(devpath.c_str(), O_RDONLY);
-	if (fevdev == -1)
+	while (!iss.eof())
 	{
-		return false;
+		std::string event_device_id;
+		getline(iss, event_device_id, ',');
+
+		int device_id = atoi(event_device_id.c_str());
+
+		std::string devpath("/dev/input/event" + event_device_id);
+
+		fevdev.push_back(open(devpath.c_str(), O_RDONLY | O_NONBLOCK));
+		if (fevdev.back() == -1)
+		{
+			return false;
+		}
+
+		if (ioctl(fevdev.back(), EVIOCGRAB, 1) != 0) //grab keyboard
+		{
+			return false;
+		}
 	}
 
-	if (ioctl(fevdev, EVIOCGRAB, 1) != 0) //grab keyboard
-	{
-		return false;
-	}
 
 	return true;
 }
 
 void KeyboardInput::ReleaseKeyboard()
 {
-	if (fevdev != -1)
+	for (int i = 0; i < fevdev.size(); i++)
 	{
-		ioctl(fevdev, EVIOCGRAB, 0); //Release grabbed keyboard
-		close(fevdev);
+		if (fevdev[i] != -1)
+		{
+			ioctl(fevdev[i], EVIOCGRAB, 0); //Release grabbed keyboard
+			close(fevdev[i]);
+		}
 	}
 }
 
@@ -133,30 +144,35 @@ int KeyboardInput::ReadKey()
 	}
 	else if (inputType == InputType::Keyboard)
 	{
-		if (fevdev == -1)
+		for (int i = 0; i < fevdev.size(); i++)
 		{
-			return ERR;
-		}
-		struct input_event ev[64];
+			if (fevdev[i] == -1)
+			{
+				return ERR;
+			}
+			struct input_event ev[2];
 
-		int rd;
-		if ((rd = read(fevdev, ev, sizeof(struct input_event) * 64)) < sizeof(struct input_event))
-		{
-			return ERR;
-		}
+			//std::cout << "Read" << std::endl;
+			int rd = read(fevdev[i], ev, sizeof(struct input_event) * 2);
 
-		int value = ev[0].value;
-		if (value != ' ' && ev[1].value == 1 && ev[1].type == EV_KEY) //value=1: key press, value=0 key release
-		{
-			return(keyEventMap(ev[1].code));
+			if (rd < 0)
+			{
+				continue;
+			}
+			//std::cout << "Ok: " << rd << std::endl;
+
+			int value = ev[0].value;
+			if (value != ' ' && ev[1].value == 1 && ev[1].type == EV_KEY) //value=1: key press, value=0 key release
+			{
+				return(keyEventMap(ev[1].code));
+			}
 		}
+		return ERR;
 	}
 	else if (inputType == InputType::RotaryEncoder)
 	{
 		return readRotaryEncoder();
 	}
-
-	return ERR;
 }
 
 std::string KeyboardInput::GetInteractiveCommandList()
@@ -180,14 +196,19 @@ std::string KeyboardInput::GetInteractiveCommandList()
 	return cmdlist.str();
 }
 
-void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
+std::string KeyboardInput::KeyPressedAction(int ch)
 {
-	int option_cycle[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '+', '-', '.', 'q' };
+	std::vector<int> option_cycle { '0', '1', '2', '3', '4', '5', '6', '7', '8', '+', '-', '.', 'q' };
 
 	bool option_changed = false;
 	int changevalue = 2; //-1: decrease value, 0: no change, 1: increase value, 2: cycle values
 	std::stringstream state_str;
-	AudioData audioData(opt.audio_card);
+	int newvolume = -1;
+
+	if (Verbose)
+	{
+		std::cout << "KeyPressedAction: ch = " << ch << std::endl;
+	}
 
 	//Menu navigation keys:
 	switch ((MovementKeys)ch)
@@ -195,115 +216,125 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 		case MovementKeys::PreviousValue:
 			changevalue = -1;
 			break;
-		case MovementKeys::NextOption:
+		case MovementKeys::PreviousOption:
 			option_changed = true;
 			if (currentOptionIndex > 0)
 			{
 				currentOptionIndex--;
 			}
+			else
+			{
+				currentOptionIndex = option_cycle.size() - 1;
+			}
 			break;
 		case MovementKeys::NextValue:
 			changevalue = 1;
 			break;
-		case MovementKeys::PreviousOption:
+		case MovementKeys::NextOption:
 			option_changed = true;
-			if (currentOptionIndex < (sizeof(option_cycle)-1))
+			if (currentOptionIndex < (option_cycle.size()-1))
 			{
 				currentOptionIndex++;
+			}
+			else
+			{
+				currentOptionIndex = 0;
 			}
 			break;
 	}
 
 	if (option_changed)
 	{
+		//just speak out currently selected option
 		switch (option_cycle[currentOptionIndex])
 		{
 			case '0':
-				state_str << "0: mute";
+				state_str << "mute";
 				break;
 			case '1':
-				state_str << "1: negative image";
+				state_str << "negative image";
 				break;
 			case '2':
-				state_str << "2: zoom";
+				state_str << "zoom";
 				break;
 			case '3':
-				state_str << "3: blinders";
+				state_str << "blinders";
 				break;
 			case '4':
-				state_str << "4: edge detection";
+				state_str << "edge detection";
 				break;
 			case '5':
-				state_str << "5: threshold";
+				state_str << "threshold";
 				break;
 			case '6':
-				state_str << "6: brightness";
+				state_str << "brightness";
 				break;
 			case '7':
-				state_str << "7: contrast";
+				state_str << "contrast";
 				break;
 			case '8':
-				state_str << "8: foveal mapping";
+				state_str << "foveal mapping";
 				break;
 			case '+':
-				state_str << "plus: volume up";
+				state_str << "volume up";
 				break;
 			case '-':
-				state_str << "minus: volume down";
+				state_str << "volume down";
 				break;
 			case ',':
 			case '.':
 			case 263: //Backspace
-				state_str << "period: default options";
+				state_str << "default options";
 				break;
 			case 'q':
 			case 27: //ESC
-				state_str << "escape: quit";
+				state_str << "quit";
 				break;
 		}
 	}
-	else
+	else //value change requested
 	{
 		if ((changevalue == -1) || (changevalue == 1))
 		{
 			//use current option if navigation keys were used:
 			ch = option_cycle[currentOptionIndex];
 		}
-		
-		//change value:
+
+		//change value and speak out new value:
+		pthread_mutex_lock(&rvopt_mutex);
 		switch (ch)
 		{
 			case '0':
-				opt.mute = !opt.mute;
-				state_str << ((opt.mute) ? "muted on" : "muted off");
+				rvopt.mute = !rvopt.mute;
+				state_str << ((rvopt.mute) ? "muted on" : "muted off");
 				break;
 			case '1':
-				opt.negative_image = !opt.negative_image;
-				state_str << ((opt.negative_image) ? "negative image on" : "negative image off");
+				rvopt.negative_image = !rvopt.negative_image;
+				state_str << ((rvopt.negative_image) ? "negative image on" : "negative image off");
 				break;
 			case '2':
-				cycleValues(opt.zoom, {1.0, 2.0, 4.0}, changevalue);
-				state_str << "zoom factor" << opt.zoom;
+				cycleValues(rvopt.zoom, {1.0, 2.0, 4.0}, changevalue);
+				state_str << "zoom factor" << rvopt.zoom;
 				break;
 			case '3':
-				opt.blinders = (opt.blinders == 0) ? (opt.columns / 4) : 0;
-				state_str << (opt.blinders == 0) ? "blinders off" : "blinders on";
+				rvopt.blinders = (rvopt.blinders == 0) ? (rvopt.columns / 4) : 0;
+				state_str << (rvopt.blinders == 0) ? "blinders off" : "blinders on";
 				break;
 			case '4':
-				cycleValues(opt.edge_detection_opacity, { 0.0, 0.5, 1.0 }, changevalue);
-				state_str << "edge detection " << opt.edge_detection_opacity;
+				cycleValues(rvopt.edge_detection_opacity, { 0.0, 0.5, 1.0 }, changevalue);
+				state_str << "edge detection " << rvopt.edge_detection_opacity;
 				break;
 			case '5':
-				cycleValues(opt.threshold, { 0, int(0.25*255), int(0.5*255), int(0.75*255) }, changevalue);
-				state_str << "threshold " << opt.threshold;
+				cycleValues(rvopt.threshold, { 0, int(0.25*255), int(0.5*255), int(0.75*255) }, changevalue);
+				state_str << "threshold " << rvopt.threshold;
 				break;
 			case '6':
-				cycleValues(opt.brightness, { -100, 0, 100 }, changevalue);
-				if (opt.brightness == 100)
+				cycleValues(rvopt.brightness, { -100, 0, 100 }, changevalue);
+				if (rvopt.brightness == 100)
 				{
 					state_str << "brightness high";
 				}
-				else if (opt.brightness == 0)
+				else if (rvopt.brightness == 0)
 				{
 					state_str << "brightness medium";
 				}
@@ -313,52 +344,50 @@ void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)
 				}
 				break;
 			case '7':
-				cycleValues(opt.contrast, { 1.0, 2.0, 3.0 }, changevalue);
-				state_str << "contrast factor " << opt.contrast;
+				cycleValues(rvopt.contrast, { 1.0, 2.0, 3.0 }, changevalue);
+				state_str << "contrast factor " << rvopt.contrast;
 				break;
 			case '8':
-				opt.foveal_mapping = !opt.foveal_mapping;
-				state_str << (opt.foveal_mapping ? "foveal mapping on" : "foveal mapping off");
+				rvopt.foveal_mapping = !rvopt.foveal_mapping;
+				state_str << (rvopt.foveal_mapping ? "foveal mapping on" : "foveal mapping off");
 				break;
 			case '+':
-				cycleValues(opt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? 1: -1);
-				audioData.SetVolume(opt.volume);
+				cycleValues(rvopt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? 1: -1);
+				newvolume = rvopt.volume;
 				state_str << "Volume up ";
 				break;
 			case '-':
-				cycleValues(opt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? -1 : 1);
-				audioData.SetVolume(opt.volume);
+				cycleValues(rvopt.volume, { 1, 2, 4, 8, 16, 32, 64, 100 }, (changevalue > 0) ? -1 : 1);
+				newvolume = rvopt.volume;
 				state_str << "Volume down ";
 				break;
 			case ',':
 			case '.':
 			case 263:
-				opt = GetCommandLineOptions();
+				rvopt = GetCommandLineOptions();
 				state_str << "default options";
 				break;
 			case 'q':
 			case 27: // ESC key
 				state_str << "goodbye";
-				opt.quit = true;
+				rvopt.quit = true;
 				break;
 		}
+		pthread_mutex_unlock(&rvopt_mutex);
 	}
 
-	//Speak state_str?
-	if ((opt.speak) && (state_str.str() != ""))
-	{
-		if (!audioData.Speak(state_str.str()))
-		{
-			std::cerr << "Error calling Speak(). Use verbose mode for more info." << std::endl;
-		}
-	}
-
-	return;
+	return state_str.str();
 }
 
 
 int KeyboardInput::keyEventMap(int event_code)
 {
+	if (Verbose)
+	{
+		//event codes see linux/input.h header file
+		std::cout << "KeyEventMap: event_code = " << event_code << std::endl;
+	}
+
 	int ch = 0;
 	switch (event_code)
 	{
@@ -366,26 +395,31 @@ int KeyboardInput::keyEventMap(int event_code)
 		case KEY_LEFT:
 		case KEY_BACK:
 		case KEY_STOP:
-			ch = 'a';
+		case KEY_F1:
+		case BTN_LEFT:
+			ch = (int)MovementKeys::PreviousValue;
 			break;
 		case KEY_S:
 		case KEY_DOWN:
 		case KEY_PREVIOUSSONG:
 		case KEY_REWIND:
-			ch = 's';
+		case KEY_F3:
+			ch = (int)MovementKeys::NextOption;
 			break;
 		case KEY_D:
 		case KEY_RIGHT:
 		case KEY_PLAYPAUSE:
 		case KEY_PLAY:
 		case KEY_PAUSE:
-			ch = 'd';
+		case BTN_RIGHT:
+			ch = (int)MovementKeys::NextValue;
 			break;
 		case KEY_W:
 		case KEY_UP:
 		case KEY_FORWARD:
 		case KEY_NEXTSONG:
-			ch = 'w';
+		case KEY_HOME:
+			ch = (int)MovementKeys::PreviousOption;
 			break;
 		case KEY_0:
 		case KEY_KP0:
@@ -467,12 +501,11 @@ int KeyboardInput::keyEventMap(int event_code)
 	return ch;
 }
 
-
 int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 {
 	int new_index = 0;
 
-	if (changevalue == -1)
+	if (changevalue == -1) //decrease (stop at 0)
 	{
 		new_index = i - 1;
 		if (new_index < 0)
@@ -480,7 +513,7 @@ int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 			new_index = 0;
 		}
 	}
-	else if (changevalue == 1)
+	else if (changevalue == 1) //increase (stop at max)
 	{
 		new_index = i + 1;
 		if (new_index > maxindex)
@@ -488,7 +521,7 @@ int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 			new_index = maxindex;
 		}
 	}
-	else if (changevalue == 2)
+	else if (changevalue == 2)  //increase (continue at 0)
 	{
 		new_index = i + 1;
 		if (new_index > maxindex)
@@ -496,7 +529,7 @@ int KeyboardInput::changeIndex(int i, int maxindex, int changevalue)
 			new_index = 0;
 		}
 	}
-	else if (changevalue == -2)
+	else if (changevalue == -2) //decrease (continue at max)
 	{
 		new_index = i - 1;
 		if (new_index < 0)
