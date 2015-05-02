@@ -11,10 +11,11 @@
 
 dir="/home/pi"
 user="pi"
-cmd="raspivoice -s2 -a1 -R7 -S -g1 -d"
+cmd="raspivoice -s2 -a1 -R7 -S -g0,1 -d"
 
 name=`basename $0`
-pid_file="/var/run/$name.pid"
+pid_path="/var/run/$name"
+pid_file="${pid_path}/$name.pid"
 stdout_log="stdout"
 stderr_log=stderr
 
@@ -26,6 +27,11 @@ is_running() {
     [ -f "$pid_file" ] && ps `get_pid` > /dev/null 2>&1
 }
 
+if [ ! -d "${pid_path}" ]; then
+    mkdir ${pid_path}
+    chown ${user} ${pid_path}
+fi
+
 case "$1" in
     start)
     if is_running; then
@@ -34,11 +40,10 @@ case "$1" in
         echo "Starting $name"
         cd "$dir"
         sudo -u "$user" $cmd >> "$stdout_log" 2>> "$stderr_log" &
-	sleep 1
-	ps -C $name --no-headers -o pid	| tail -n 1 >"$pid_file"
 
+	sleep 1
         if ! is_running; then
-            echo "Unable to start, see $stdout_log and $stderr_log"
+            echo "Unable to start"
             exit 1
         fi
     fi

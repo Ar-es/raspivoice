@@ -45,6 +45,8 @@ int saved_stderr = -1;
 
 std::exception_ptr exc_ptr;
 
+std::string pidfilename = "/var/run/raspivoice/raspivoice.pid";
+
 int main(int argc, char *argv[])
 {
 	if (!SetCommandLineOptions(argc, argv))
@@ -349,4 +351,12 @@ void daemon_startup(void)
 
 	close(STDOUT_FILENO);
 	close(STDERR_FILENO);
+
+	//write pidfile if possible:
+	FILE *fp_pid = fopen(pidfilename.c_str(), "wt");
+	if (fp_pid != NULL)
+	{
+		fprintf(fp_pid, "%d\n", getpid());
+		fclose(fp_pid);
+	}
 }
