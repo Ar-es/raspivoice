@@ -27,7 +27,8 @@ KeyboardInput::KeyboardInput() :
 	fevdev(-1),
 	currentOptionIndex(0),
 	lastEncoderValue(0),
-	encoder(nullptr)
+	encoder(nullptr),
+	Verbose(false)
 {
 }
 
@@ -48,7 +49,11 @@ int KeyboardInput::readRotaryEncoder()
 		long l = encoder->value;
 		if (l != lastEncoderValue)
 		{
-			//printf("lastEncoderValue: %ld\n", l);
+			if (Verbose)
+			{
+				printf("\nlastEncoderValue: %ld, new encoder value: %ld\n", lastEncoderValue, l);
+			}
+			
 			if (l > lastEncoderValue)
 			{
 				ch = (int)MovementKeys::NextOption;
@@ -120,6 +125,10 @@ int KeyboardInput::ReadKey()
 {
 	if (inputType == InputType::Terminal)
 	{
+		return getchar();
+	}
+	else if (inputType == InputType::NCurses)
+	{
 		return getch();
 	}
 	else if (inputType == InputType::Keyboard)
@@ -150,23 +159,25 @@ int KeyboardInput::ReadKey()
 	return ERR;
 }
 
-void KeyboardInput::PrintInteractiveCommands()
+std::string KeyboardInput::GetInteractiveCommandList()
 {
-	printw("raspivoice\n");
-	printw("Press key to cycle settings:\n");
-	printw("0: Mute [off, on]\n");
-	printw("1: Negative image [off, on]\n");
-	printw("2: Zoom [off, x2, x4]\n");
-	printw("3: Blinders [off, on]\n");
-	printw("4: Edge detection [off, 50%%, 100%%]\n");
-	printw("5: Threshold [off, 25%%, 50%%, 75%%]\n");
-	printw("6: Brightness [low, normal, high]\n");
-	printw("7: Contrast [x1, x2, x3]\n");
-	printw("8: Foveal mapping [off, on]\n");
-	printw(".: Restore defaults\n");
-	printw("q, [Escape]: Quit\n");
+	std::stringstream cmdlist;
+	
+	cmdlist << "raspivoice" << std::endl;
+	cmdlist << "Press key to cycle settings:" << std::endl;
+	cmdlist << "0: Mute [off, on]" << std::endl;
+	cmdlist << "1: Negative image [off, on]" << std::endl;
+	cmdlist << "2: Zoom [off, x2, x4]" << std::endl;
+	cmdlist << "3: Blinders [off, on]" << std::endl;
+	cmdlist << "4: Edge detection [off, 50%%, 100%%]" << std::endl;
+	cmdlist << "5: Threshold [off, 25%%, 50%%, 75%%]" << std::endl;
+	cmdlist << "6: Brightness [low, normal, high]" << std::endl;
+	cmdlist << "7: Contrast [x1, x2, x3]" << std::endl;
+	cmdlist << "8: Foveal mapping [off, on]" << std::endl;
+	cmdlist << ".: Restore defaults" << std::endl;
+	cmdlist << "q, [Escape]: Quit" << std::endl;
 
-	refresh();
+	return cmdlist.str();
 }
 
 void KeyboardInput::KeyPressedAction(RaspiVoiceOptions &opt, int ch)

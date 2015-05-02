@@ -63,9 +63,11 @@ int main(int argc, char *argv[])
 		daemon_startup();
 	}
 
-	KeyboardInput keyboardInput;
 
 	//Setup keyboard:
+	KeyboardInput keyboardInput;
+	keyboardInput.Verbose = cmdline_opt.verbose;
+
 	bool use_ncurses = true;
 	if (cmdline_opt.verbose || cmdline_opt.daemon)
 	{
@@ -86,9 +88,13 @@ int main(int argc, char *argv[])
 	}
 	else if (use_ncurses)
 	{
+		keyboardInput.SetInputType(KeyboardInput::InputType::NCurses);
+	}
+	else if (!cmdline_opt.daemon)
+	{
 		keyboardInput.SetInputType(KeyboardInput::InputType::Terminal);
 	}
-	
+
 
 	//Start Program in worker thread:
 	rvopt = cmdline_opt;
@@ -108,7 +114,8 @@ int main(int argc, char *argv[])
 		//Show interactive screen:
 		if (setup_screen())
 		{
-			keyboardInput.PrintInteractiveCommands();
+			printw("%s", keyboardInput.GetInteractiveCommandList().c_str());
+			refresh();
 
 			main_loop(keyboardInput);
 
@@ -117,14 +124,9 @@ int main(int argc, char *argv[])
 	}
 	else if ((cmdline_opt.verbose) && (!cmdline_opt.daemon))
 	{
-		//Show debug messages:
-		std::cout << "Verbose mode on, interactive mode disabled." << std::endl;
-		std::cout << "Press Enter to quit." << std::endl << std::endl;
-		getchar();
-
-		pthread_mutex_lock(&rvopt_mutex);
-		rvopt.quit = true;
-		pthread_mutex_unlock(&rvopt_mutex);
+		std::cout << "Verbose mode on, curses UI disabled." << std::endl;
+		std::cout << keyboardInput.GetInteractiveCommandList();
+		main_loop(keyboardInput);
 	}
 	else
 	{

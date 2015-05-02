@@ -11,6 +11,7 @@ public:
 	{
 		NoInput = 0,
 		Terminal,
+		NCurses,
 		Keyboard,
 		RotaryEncoder
 	};
@@ -30,11 +31,13 @@ private:
 	void cycleValues(int &current_value, std::vector<int> value_list, int changevalue);
 	void cycleValues(float &current_value, std::vector<float> value_list, int changevalue);
 public:
+	bool Verbose;
+
 	KeyboardInput();
 	bool SetInputType(InputType, std::string keyboard = "");
 	void KeyPressedAction(RaspiVoiceOptions &opt, int ch);
 	void ReleaseKeyboard();
 	int ReadKey();
-	void PrintInteractiveCommands();
+	std::string GetInteractiveCommandList();
 };
 
