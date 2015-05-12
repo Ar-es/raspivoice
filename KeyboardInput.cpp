@@ -27,6 +27,7 @@ KeyboardInput::KeyboardInput() :
 	fevdev(0),
 	currentOptionIndex(0),
 	lastEncoderValue(0),
+	lastSwitchPressCount(0),
 	encoder(nullptr),
 	Verbose(false)
 {
@@ -36,7 +37,7 @@ KeyboardInput::KeyboardInput() :
 void KeyboardInput::setupRotaryEncoder()
 {
 	wiringPiSetup();
-	encoder = setupencoder(4, 5);
+	encoder = setupencoder(4, 5, 6);
 }
 
 int KeyboardInput::readRotaryEncoder()
@@ -44,7 +45,7 @@ int KeyboardInput::readRotaryEncoder()
 	int ch = ERR;
 	if (encoder != nullptr)
 	{
-		updateEncoders();
+		//updateEncoders();
 		usleep(100000);
 		long l = encoder->value;
 		if (l != lastEncoderValue)
@@ -66,7 +67,17 @@ int KeyboardInput::readRotaryEncoder()
 			lastEncoderValue = l;
 		}
 
-		//TODO: Read GPIO button press and set ch = (int)MenuKeys::PreviousValue and (int)MenuKeys::NextValue;
+		l = encoder->switchpresscount;
+		if (l != lastSwitchPressCount)
+		{
+			if (Verbose)
+			{
+				printf("\nlastSwitchPressCount: %ld, new switchpresscount: %ld\n", lastSwitchPressCount, l);
+			}
+			ch = (int)MenuKeys::CycleValue;
+			
+			lastSwitchPressCount = l;
+		}
 	}
 
 	return ch;

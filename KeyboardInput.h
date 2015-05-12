@@ -22,6 +22,7 @@ private:
 	struct encoder *encoder;
 	InputType inputType;
 	long lastEncoderValue;
+	long lastSwitchPressCount;
 
 	void setupRotaryEncoder();
 	int readRotaryEncoder();
